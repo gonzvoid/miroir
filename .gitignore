@@ -1,0 +1,7 @@
+node_modules
+dist
+release
+.env
+.DS_Store
+*.log
+electron/google-credentials.json
