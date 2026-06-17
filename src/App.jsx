@@ -150,7 +150,7 @@ function LayoutSchematic({ cols, active }) {
   );
 }
 
-function OnboardingScreen({ onDone, onClose }) {
+function OnboardingScreen({ onDone, onClose, theme }) {
   const [step, setStep] = useState(0);
   const [name, setName] = useState('');
   const [workType, setWorkType] = useState(null);
@@ -176,7 +176,9 @@ function OnboardingScreen({ onDone, onClose }) {
 
   return (
     <div className="fixed inset-0 flex items-center justify-center"
-      style={{ backgroundImage: 'url(/onboarding_bg.png)', backgroundSize: 'cover', backgroundPosition: 'center' }}>
+      style={{ background: theme === 'dark'
+        ? 'linear-gradient(160deg, #141614 0%, #1B1E1A 55%, #0F110E 100%)'
+        : 'linear-gradient(160deg, #F8F8F6 0%, #EEF0EB 55%, #E6E9E2 100%)' }}>
 
       <div className={`w-full max-w-[400px] px-8 transition-all duration-200
         ${transitioning ? 'opacity-0 translate-y-1.5' : 'opacity-100 translate-y-0'}`}>
@@ -493,7 +495,7 @@ export default function App() {
 
   if (s.name === null || s.name === undefined) {
     return (
-      <OnboardingScreen onDone={(name, workType) => {
+      <OnboardingScreen theme={s.theme} onDone={(name, workType) => {
         patch('name', name);
         patch('workType', workType);
         patch('layout', LAYOUT_PRESETS[workType] ?? DEFAULT_LAYOUT);
@@ -506,6 +508,7 @@ export default function App() {
   if (previewOnboarding) {
     return (
       <OnboardingScreen
+        theme={s.theme}
         onClose={() => setPreviewOnboarding(false)}
         onDone={() => setPreviewOnboarding(false)}
       />
