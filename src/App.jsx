@@ -16,39 +16,38 @@ import {
   DEFAULT_CALENDARS, DEFAULT_LOOPS, DEFAULT_TAGS, SEED_EVENT_IDS,
   LAYOUT_PRESETS, TAGS_PRESETS, TILE_CATALOG, parseYmd,
 } from './lib/utils';
-import { GripVertical } from './components/icons';
+import { GripVertical, X, Plus } from './components/icons';
 import Header from './components/Header';
 import Focal from './components/Focal';
 import ImageTile from './components/ImageTile';
 import LayoutEditor from './components/LayoutEditor';
 import SettingsPanel from './components/SettingsPanel';
 import {
-  Timeline, QuickCapture, DailyLoops, Summary, Countdown, Sources,
+  Timeline, DailyLoops, Summary, Countdown, Sources,
   MoodPanel, CalCard, TaskHistory, Doodle, LunchMenu,
   FocusTile, ProjectsTile, BooksTile, TripTile, LiveCanvas,
+  WorldClockTile, InspoLinksTile, PlantTrackerTile, SocialPlannerTile,
 } from './components/Tiles';
 
 const DEFAULT_LAYOUT = {
-  left: ['focal', 'capture', 'summary'],
-  mid:  ['loops', 'visual', 'timeline', 'sources'],
+  left:  ['focal', 'summary'],
+  mid:   ['loops', 'image', 'countdown', 'timeline', 'sources'],
   right: ['mood', 'calendar'],
+  far:   [],
 };
 
 function migrateLayout(l) {
-  if (!l) return DEFAULT_LAYOUT;
+  if (!l || typeof l !== 'object' || Array.isArray(l)) return DEFAULT_LAYOUT;
   const fix = (arr) => {
     if (!arr) return [];
     const out = [];
-    for (let i = 0; i < arr.length; i++) {
-      if (arr[i] === 'image' || arr[i] === 'countdown') {
-        if (!out.includes('visual')) out.push('visual');
-      } else {
-        out.push(arr[i]);
-      }
+    for (const id of arr) {
+      if (id === 'visual') out.push('image', 'countdown');
+      else if (id !== 'capture') out.push(id);
     }
     return out;
   };
-  return { left: fix(l.left), mid: fix(l.mid), right: fix(l.right) };
+  return { left: fix(l.left), mid: fix(l.mid), right: fix(l.right), far: fix(l.far) };
 }
 
 const DEFAULTS = {
@@ -57,11 +56,20 @@ const DEFAULTS = {
   loops: DEFAULT_LOOPS, countdowns: [], layout: DEFAULT_LAYOUT,
   tags: DEFAULT_TAGS, name: null, workType: null,
   doodles: {}, lunchMenu: {},
+  imageAlbums: [],
+  plants: [],
+  clocks: [
+    { id: 'c1', city: 'Madrid',   tz: 'Europe/Madrid' },
+    { id: 'c2', city: 'New York', tz: 'America/New_York' },
+  ],
+  inspoLinks: [],
+  clockFace: 'list',
   accentColor: 'slate', language: 'en', weekStart: 'mon', _v: 0,
   projects: [],
   books: { current: null, completed: [] },
   trip: null,
   pomodoroLog: [],
+  socialPlanner: { enabledNetworks: ['instagram', 'x'], posts: [] },
 };
 
 /* ---- drag helpers ---- */
@@ -71,7 +79,7 @@ function findContainerInLayout(layout, id) {
 }
 
 /* ---- SortableTile ---- */
-function SortableTile({ id, unlocked, isAnyDragging, children }) {
+function SortableTile({ id, unlocked, isAnyDragging, onRemove, children }) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } =
     useSortable({ id, disabled: !unlocked });
   return (
@@ -84,9 +92,16 @@ function SortableTile({ id, unlocked, isAnyDragging, children }) {
       }}
       className="relative">
       {unlocked && (
-        <div {...attributes} {...listeners}
-          className="absolute top-2.5 right-2.5 z-20 w-6 h-6 grid place-items-center bg-surface-3 rounded-full cursor-grab active:cursor-grabbing text-text-3 hover:text-text shadow-sm transition-colors">
-          <GripVertical size={13} />
+        <div className="absolute top-2.5 right-2.5 z-20 flex items-center gap-1">
+          <button
+            onClick={() => onRemove?.(id)}
+            className="w-6 h-6 grid place-items-center bg-surface-3 rounded-full text-text-3 hover:text-[#c0564b] hover:bg-red-50 shadow-sm transition-colors">
+            <X size={11} />
+          </button>
+          <div {...attributes} {...listeners}
+            className="w-6 h-6 grid place-items-center bg-surface-3 rounded-full cursor-grab active:cursor-grabbing text-text-3 hover:text-text shadow-sm transition-colors">
+            <GripVertical size={13} />
+          </div>
         </div>
       )}
       {children}
@@ -94,17 +109,44 @@ function SortableTile({ id, unlocked, isAnyDragging, children }) {
   );
 }
 
+/* ---- GhostTile — add tile from edit mode ---- */
+function GhostTile({ available, onAdd }) {
+  const [open, setOpen] = useState(false);
+  if (!available.length) return null;
+  return (
+    <div className="relative">
+      <button onClick={() => setOpen((v) => !v)}
+        className="w-full rounded-card border border-dashed flex items-center justify-center transition-colors hover:bg-surface-2"
+        style={{ minHeight: 52, opacity: 0.4, borderColor: 'var(--stroke)' }}>
+        <Plus size={13} className="text-text-3" />
+      </button>
+      {open && (
+        <div className="absolute top-full left-0 mt-1.5 bg-surface border border-stroke rounded-xl shadow-lg p-1.5 z-30 min-w-[170px]"
+          onMouseLeave={() => setOpen(false)}>
+          {available.map((t) => (
+            <button key={t.id} onClick={() => { onAdd(t.id); setOpen(false); }}
+              className="flex w-full items-center px-2.5 py-2 rounded-lg hover:bg-surface-2 text-text-2 hover:text-text text-[12.5px] text-left transition-colors">
+              {t.label}
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 /* ---- DroppableColumn ---- */
-function DroppableColumn({ id, items, unlocked, isAnyDragging, tileMap, className }) {
+function DroppableColumn({ id, items, unlocked, isAnyDragging, tileMap, onRemoveTile, availableTiles, onAddTile, className }) {
   const { setNodeRef } = useDroppable({ id });
   return (
     <SortableContext items={items} strategy={verticalListSortingStrategy}>
       <div ref={setNodeRef} className={`flex flex-col gap-4 min-h-20 ${className ?? ''}`}>
         {items.map((tileId) => (
-          <SortableTile key={tileId} id={tileId} unlocked={unlocked} isAnyDragging={isAnyDragging}>
+          <SortableTile key={tileId} id={tileId} unlocked={unlocked} isAnyDragging={isAnyDragging} onRemove={onRemoveTile}>
             {tileMap[tileId]}
           </SortableTile>
         ))}
+        {unlocked && <GhostTile available={availableTiles} onAdd={(tileId) => onAddTile(tileId, id)} />}
       </div>
     </SortableContext>
   );
@@ -178,6 +220,8 @@ function OnboardingScreen({ onDone, onClose, theme }) {
     <div className="fixed inset-0 flex items-center justify-center"
       style={{ background: theme === 'dark'
         ? 'linear-gradient(160deg, #141614 0%, #1B1E1A 55%, #0F110E 100%)'
+        : theme === 'cream'
+        ? 'linear-gradient(160deg, #FDF8F3 0%, #F5EFE4 55%, #ECE5D7 100%)'
         : 'linear-gradient(160deg, #F8F8F6 0%, #EEF0EB 55%, #E6E9E2 100%)' }}>
 
       <div className={`w-full max-w-[400px] px-8 transition-all duration-200
@@ -296,6 +340,19 @@ export default function App() {
     return () => window.removeEventListener('keydown', handler);
   }, []);
 
+  // R → toggle layout unlock mode (when not focused on an input)
+  useEffect(() => {
+    const handler = (e) => {
+      if ((e.key === 'r' || e.key === 'R') && !e.ctrlKey && !e.metaKey && !e.altKey) {
+        const tag = document.activeElement?.tagName;
+        if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return;
+        setUnlocked((v) => !v);
+      }
+    };
+    window.addEventListener('keydown', handler);
+    return () => window.removeEventListener('keydown', handler);
+  }, []);
+
   const tasks = s.tasks, moods = s.moods;
   const layout = migrateLayout(s.layout);
 
@@ -401,6 +458,14 @@ export default function App() {
   const vTasks  = useMemo(() => filter === 'all' ? tasks : tasks.filter((t) => t.lane === filter), [tasks, filter]);
   const vEvents = useMemo(() => filter === 'all' ? allEvents : allEvents.filter((e) => e.calendarId === filter), [allEvents, filter]);
 
+  // Migrate legacy tileImages/imageFolder → multi-album format (plain const, no hook)
+  const imageAlbums = (s.imageAlbums && s.imageAlbums.length > 0)
+    ? s.imageAlbums
+    : (s.tileImages && s.tileImages.length > 0)
+      ? [{ id: 'album-default', name: 'Album 1', images: s.tileImages, folder: s.imageFolder ?? null }]
+      : [];
+  const setImageAlbums = (v) => patch('imageAlbums', typeof v === 'function' ? v(imageAlbums) : v);
+
   /* ---- new tile handlers ---- */
   const addProject    = (p)  => patch('projects', (ps) => [...ps, p]);
   const updateProject = (id, changes) => patch('projects', (ps) => ps.map((p) => p.id === id ? { ...p, ...changes } : p));
@@ -425,19 +490,13 @@ export default function App() {
     focal:    <Focal tasks={vTasks} addTask={addTask} cycleTask={cycleTask} delTask={delTask}
                 editTask={editTask} setTaskStatus={setTaskStatus} setTaskLane={setTaskLane}
                 moveTask={moveTask} reorderTask={reorderTask} composerRef={composerRef} tags={tags} />,
-    capture:  <QuickCapture ideas={s.ideas} addIdea={addIdea} delIdea={delIdea}
-                ideaToTask={ideaToTask} addEvent={addEvent} focusComposer={focusComposer} />,
     summary:  <Summary tasks={tasks} moods={moods} now={now} />,
     tasklog:  <TaskHistory tasks={tasks} now={now} />,
     loops:    <DailyLoops loops={s.loops} setLoops={(v) => patch('loops', v)} />,
     doodle:   <Doodle doodles={s.doodles} setDoodles={(v) => patch('doodles', v)} now={now} />,
     lunchMenu:<LunchMenu lunchMenu={s.lunchMenu} setLunchMenu={(v) => patch('lunchMenu', v)} now={now} />,
-    visual: (
-      <div className="grid grid-cols-2 gap-4">
-        <ImageTile images={s.tileImages} setImages={(v) => patch('tileImages', v)} folder={s.imageFolder} setFolder={(v) => patch('imageFolder', v)} />
-        <Countdown countdowns={s.countdowns} setCountdowns={(v) => patch('countdowns', v)} />
-      </div>
-    ),
+    image:    <ImageTile albums={imageAlbums} setAlbums={setImageAlbums} />,
+    countdown:<Countdown countdowns={s.countdowns} setCountdowns={(v) => patch('countdowns', v)} />,
     timeline: <Timeline events={vEvents} now={now} />,
     sources:  <Sources calendars={allCalendars} setCalendars={(v) => patch('calendars', v)}
                 googleAccounts={googleAccounts} onConnect={onConnect} onDisconnect={onDisconnect}
@@ -445,33 +504,70 @@ export default function App() {
                 syncErrors={googleSyncErrors} onRefresh={fetchGoogleEvents} />,
     calendar: <CalCard viewMonth={viewMonth} setViewMonth={setViewMonth} events={vEvents}
                 calendars={allCalendars} addEvent={addEvent} />,
-    mood:     <MoodPanel selDay={selDay} shiftDay={shiftDay} moods={moods} setMoodSeg={setMoodSeg} now={now} />,
+    mood:     <MoodPanel selDay={selDay} shiftDay={shiftDay} setSelDay={setSelDay} moods={moods} setMoodSeg={setMoodSeg} now={now} />,
     focus:    <FocusTile pomodoroLog={s.pomodoroLog} onLogSession={logPomodoroSession} />,
     projects: <ProjectsTile projects={s.projects} onAdd={addProject} onUpdate={updateProject} onDelete={deleteProject} />,
     books:    <BooksTile books={s.books} onSet={setCurrentBook} onUpdate={updateCurrentPage} onComplete={completeCurrentBook} onDeleteCompleted={deleteCompletedBook} />,
     trip:     <TripTile trip={s.trip} onSet={setTrip} onUpdate={updateTrip} onClear={clearTrip} />,
-    canvas:   <LiveCanvas />,
+    canvas:      <LiveCanvas />,
+    worldclock:  <WorldClockTile  clocks={s.clocks}     setClocks={(v)    => patch('clocks', v)}  clockFace={s.clockFace}  setClockFace={(v) => patch('clockFace', v)} />,
+    inspolinks:  <InspoLinksTile  links={s.inspoLinks}  setLinks={(v)     => patch('inspoLinks', v)} />,
+    plants:      <PlantTrackerTile plants={s.plants}    setPlants={(v)    => patch('plants', v)} />,
+    social:      <SocialPlannerTile planner={s.socialPlanner} setPlanner={(v) => patch('socialPlanner', v)} />,
   };
+
+  const addTileToColumn = useCallback((tileId, col) => {
+    patch('layout', {
+      left: layout.left, mid: layout.mid, right: layout.right, far: layout.far,
+      [col]: [...(layout[col] ?? []), tileId],
+    });
+  }, [layout, patch]);
+
+  const removeTileFromLayout = useCallback((tileId) => {
+    patch('layout', {
+      left:  layout.left.filter((id) => id !== tileId),
+      mid:   layout.mid.filter((id) => id !== tileId),
+      right: layout.right.filter((id) => id !== tileId),
+      far:   layout.far.filter((id) => id !== tileId),
+    });
+  }, [layout, patch]);
 
   /* ---- DnD ---- */
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 8 } }));
   const [draftLayout, setDraftLayout] = useState(null);
   const activeLayout = draftLayout ?? layout;
+  const placedIds      = new Set([...(activeLayout.left??[]), ...(activeLayout.mid??[]), ...(activeLayout.right??[]), ...(activeLayout.far??[])]);
+  const availableTiles = TILE_CATALOG.filter((t) => !placedIds.has(t.id));
+  const dragOverTimer = useRef(null);
+  const pendingDragOver = useRef(null);
 
-  const handleDragStart = ({ active }) => { setActiveId(active.id); setDraftLayout(layout); };
+  const handleDragStart = ({ active }) => {
+    clearTimeout(dragOverTimer.current);
+    setActiveId(active.id);
+    setDraftLayout(layout);
+  };
   const handleDragOver = useCallback(({ active, over }) => {
     if (!over) return;
-    setDraftLayout((l) => {
-      if (!l) return l;
-      const ac = findContainerInLayout(l, active.id);
-      const oc = findContainerInLayout(l, over.id) ?? (over.id in l ? over.id : null);
-      if (!ac || !oc || ac === oc) return l;
-      const aItems = l[ac], oItems = l[oc];
-      const overIdx = over.id in l ? oItems.length : oItems.indexOf(over.id);
-      return { ...l, [ac]: aItems.filter((id) => id !== active.id), [oc]: [...oItems.slice(0, overIdx), active.id, ...oItems.slice(overIdx)] };
-    });
+    pendingDragOver.current = { active, over };
+    clearTimeout(dragOverTimer.current);
+    dragOverTimer.current = setTimeout(() => {
+      const pending = pendingDragOver.current;
+      if (!pending) return;
+      const { active: a, over: o } = pending;
+      setDraftLayout((l) => {
+        if (!l) return l;
+        const ac = findContainerInLayout(l, a.id);
+        const oc = findContainerInLayout(l, o.id) ?? (o.id in l ? o.id : null);
+        if (!ac || !oc || ac === oc) return l;
+        const aItems = l[ac], oItems = l[oc];
+        const overIdx = o.id in l ? oItems.length : oItems.indexOf(o.id);
+        return { ...l, [ac]: aItems.filter((id) => id !== a.id), [oc]: [...oItems.slice(0, overIdx), a.id, ...oItems.slice(overIdx)] };
+      });
+    }, 90);
   }, []);
   const handleDragEnd = useCallback(({ active, over }) => {
+    clearTimeout(dragOverTimer.current);
+    pendingDragOver.current = null;
     setActiveId(null);
     setDraftLayout((draft) => {
       if (!draft) return null;
@@ -541,23 +637,26 @@ export default function App() {
         <SettingsPanel s={s} patch={patch} onClose={() => setShowSettings(false)} />
       )}
 
-      <div className="max-w-[1240px] mx-auto px-[26px] pt-[26px] pb-7">
+      <div className="max-w-[1240px] mx-auto px-[26px] pt-2 pb-7">
         <Header
           theme={s.theme} setTheme={(v) => patch('theme', v)}
-          bg={s.bg} setBg={(v) => patch('bg', v)}
           filter={filter} setFilter={setFilter}
           now={now} unlocked={unlocked} setUnlocked={setUnlocked}
           name={s.name} tags={tags} setTags={(v) => patch('tags', v)}
-          accentColor={s.accentColor} setAccentColor={(v) => patch('accentColor', v)}
           onOpenLayoutEditor={() => setShowLayoutEditor(true)}
           onOpenSettings={() => setShowSettings(true)}
         />
 
         <DndContext sensors={sensors} collisionDetection={closestCorners}
           onDragStart={handleDragStart} onDragOver={handleDragOver} onDragEnd={handleDragEnd}>
-          <div className="grid grid-cols-1 lg:grid-cols-[1.25fr_1fr_1.05fr] gap-4 items-start">
-            {['left', 'mid', 'right'].map((col) => (
-              <DroppableColumn key={col} id={col} items={activeLayout[col] ?? []} unlocked={unlocked} isAnyDragging={!!activeId} tileMap={tileMap} />
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-[1.25fr_1fr_1.05fr] 2xl:grid-cols-[1.25fr_1fr_1.05fr_1fr] gap-4 items-start">
+            {['left', 'mid', 'right', 'far'].map((col) => (
+              <div key={col} className={[
+                col === 'right' ? 'md:col-span-2 lg:col-span-1' : '',
+                col === 'far'   ? 'hidden 2xl:block' : '',
+              ].filter(Boolean).join(' ') || undefined}>
+                <DroppableColumn id={col} items={activeLayout[col] ?? []} unlocked={unlocked} isAnyDragging={!!activeId} tileMap={tileMap} onRemoveTile={removeTileFromLayout} availableTiles={availableTiles} onAddTile={addTileToColumn} />
+              </div>
             ))}
           </div>
 

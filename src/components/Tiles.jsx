@@ -5,7 +5,7 @@ import {
 } from '../lib/utils';
 import {
   Plus, Check, X, ChevronLeft, ChevronRight, Trash2, ArrowRight, Link2,
-  CheckSquare, CalIcon,
+  CheckSquare, CalIcon, Globe, Clock, Droplets, ExternalLink, Settings,
 } from './icons';
 
 const Card = ({ children, className = '' }) => (
@@ -17,6 +17,98 @@ const Head = ({ title, right }) => (
     {right}
   </div>
 );
+
+/* ---- DatePicker ---- */
+const PICKER_MONTHS = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+function DatePicker({ value, onChange, placeholder = 'Pick a date' }) {
+  const [open, setOpen] = useState(false);
+  const [view, setView] = useState(() => {
+    const d = value ? new Date(value + 'T00:00:00') : new Date();
+    return new Date(d.getFullYear(), d.getMonth(), 1);
+  });
+  const ref = useRef(null);
+
+  useEffect(() => {
+    const down = (e) => { if (ref.current && !ref.current.contains(e.target)) setOpen(false); };
+    document.addEventListener('mousedown', down);
+    return () => document.removeEventListener('mousedown', down);
+  }, []);
+
+  const todayStr = ymd(new Date());
+  const year = view.getFullYear(), month = view.getMonth();
+  const dow0 = new Date(year, month, 1).getDay();
+  const offset = dow0 === 0 ? 6 : dow0 - 1;
+  const gridStart = new Date(year, month, 1 - offset);
+  const days = Array.from({ length: 42 }, (_, i) => {
+    const d = new Date(gridStart); d.setDate(gridStart.getDate() + i); return d;
+  });
+  const label = value
+    ? new Date(value + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
+    : '';
+
+  return (
+    <div ref={ref} className="relative">
+      <button type="button" onClick={() => setOpen((v) => !v)}
+        className="w-full text-left text-[13px] bg-surface-2 rounded-xl px-3 py-2 outline-none flex items-center justify-between gap-2 hover:bg-surface-3 transition-colors">
+        <span className={label ? 'text-text' : 'text-text-3'}>{label || placeholder}</span>
+        <svg width="12" height="12" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" className="text-text-3 shrink-0">
+          <rect x="1" y="2" width="12" height="11" rx="2" /><line x1="1" y1="6" x2="13" y2="6" />
+          <line x1="4" y1="0" x2="4" y2="4" /><line x1="10" y1="0" x2="10" y2="4" />
+        </svg>
+      </button>
+
+      {open && (
+        <div className="absolute top-full left-0 mt-1.5 z-50 bg-surface border border-stroke rounded-2xl p-3"
+          style={{ width: 238, boxShadow: 'var(--shadow-lg)' }}>
+          <div className="flex items-center justify-between mb-3">
+            <button onClick={() => setView(new Date(year, month - 1, 1))}
+              className="w-7 h-7 grid place-items-center text-text-2 hover:text-text hover:bg-surface-2 rounded-full transition-colors">
+              <ChevronLeft size={14} />
+            </button>
+            <span className="text-[13px] font-medium text-text">{PICKER_MONTHS[month]} {year}</span>
+            <button onClick={() => setView(new Date(year, month + 1, 1))}
+              className="w-7 h-7 grid place-items-center text-text-2 hover:text-text hover:bg-surface-2 rounded-full transition-colors">
+              <ChevronRight size={14} />
+            </button>
+          </div>
+          <div className="grid grid-cols-7 mb-1">
+            {['M','T','W','T','F','S','S'].map((d, i) => (
+              <span key={i} className="text-center text-[10px] tracking-wide uppercase text-text-3">{d}</span>
+            ))}
+          </div>
+          <div className="grid grid-cols-7 gap-[2px]">
+            {days.map((d, i) => {
+              const str = ymd(d);
+              const inMonth = d.getMonth() === month;
+              const isSel = str === value;
+              const isToday = str === todayStr;
+              return (
+                <button key={i} onClick={() => { onChange(ymd(d)); setOpen(false); }}
+                  className={[
+                    'aspect-square rounded-[8px] text-[12px] flex items-center justify-center transition-colors',
+                    isSel ? 'bg-accent font-semibold' : isToday ? 'bg-accent-tint text-accent-text font-semibold' : 'hover:bg-surface-2 text-text',
+                    !inMonth ? 'opacity-25' : '',
+                  ].join(' ')}
+                  style={isSel ? { color: 'var(--canvas)' } : undefined}>
+                  {d.getDate()}
+                </button>
+              );
+            })}
+          </div>
+          <div className="mt-2 pt-2 border-t border-stroke flex justify-between">
+            <button onClick={() => { onChange(''); setOpen(false); }}
+              className="text-[11.5px] text-text-3 hover:text-text transition-colors">Clear</button>
+            <button onClick={() => {
+              onChange(todayStr);
+              setView(new Date(new Date().getFullYear(), new Date().getMonth(), 1));
+              setOpen(false);
+            }} className="text-[11.5px] text-text-3 hover:text-text transition-colors">Today</button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
 
 /* ---------------- Timeline (Today) ---------------- */
 export function Timeline({ events, now }) {
@@ -284,8 +376,7 @@ export function Countdown({ countdowns, setCountdowns }) {
           <input value={draft.label} onChange={(e) => setDraft((d) => ({ ...d, label: e.target.value }))}
             placeholder="Label (e.g. Wedding)" autoFocus
             className="w-full text-[13px] bg-surface-2 rounded-xl px-3 py-2 outline-none" />
-          <input type="date" value={draft.date} onChange={(e) => setDraft((d) => ({ ...d, date: e.target.value }))}
-            className="w-full text-[13px] bg-surface-2 rounded-xl px-3 py-2 outline-none" />
+          <DatePicker value={draft.date} onChange={(v) => setDraft((d) => ({ ...d, date: v }))} />
           <div className="flex gap-2 mt-1">
             <button onClick={save} className="flex-1 bg-accent text-white text-[12px] py-1.5 rounded-full">
               {editId ? 'Save' : 'Add'}
@@ -390,7 +481,7 @@ export function Sources({ calendars, setCalendars, googleAccounts, onConnect, on
 const DAY_ABBR = ['Su', 'Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa'];
 
 /* ---------------- Mood panel (logger + 30-day heatmap) ---------------- */
-export function MoodPanel({ selDay, shiftDay, moods, setMoodSeg, now }) {
+export function MoodPanel({ selDay, shiftDay, setSelDay, moods, setMoodSeg, now }) {
   const d = parseYmd(selDay); const isToday = sameDay(d, new Date());
   const dm = moods[selDay] || {};
   const [moodView, setMoodView] = useState('month');
@@ -453,13 +544,15 @@ export function MoodPanel({ selDay, shiftDay, moods, setMoodSeg, now }) {
               {monthCols.map(({ d: dd, key }) => {
                 const hm = moods[key] || {};
                 const isSel = key === selDay;
+                const c0 = hm.morning?.level ? moodColor(hm.morning.level) : 'var(--surface-2)';
+                const c1 = hm.midday?.level  ? moodColor(hm.midday.level)  : 'var(--surface-2)';
+                const c2 = hm.evening?.level ? moodColor(hm.evening.level) : 'var(--surface-2)';
                 return (
-                  <div key={key} className={`flex-1 min-w-0 rounded-[5px] overflow-hidden flex flex-col ${isSel ? 'ring-2 ring-accent ring-offset-1 ring-offset-surface' : ''}`}
-                    style={{ height: 38 }} title={dd.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}>
-                    {SEGMENTS.map((s) => (
-                      <span key={s.id} className="flex-1" style={{ background: hm[s.id]?.level ? moodColor(hm[s.id].level) : 'var(--surface-2)' }} />
-                    ))}
-                  </div>
+                  <div key={key}
+                    onClick={() => setSelDay(key)}
+                    className={`flex-1 min-w-0 rounded-[5px] cursor-pointer hover:opacity-80 transition-opacity ${isSel ? 'ring-2 ring-accent ring-offset-1 ring-offset-surface' : ''}`}
+                    style={{ height: 38, background: `linear-gradient(to bottom, ${c0}, ${c1}, ${c2})` }}
+                    title={dd.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} />
                 );
               })}
             </div>
@@ -476,15 +569,16 @@ export function MoodPanel({ selDay, shiftDay, moods, setMoodSeg, now }) {
               const hm = moods[key] || {};
               const isSel = key === selDay;
               const isT = sameDay(dd, now);
+              const c0 = hm.morning?.level ? moodColor(hm.morning.level) : 'var(--surface-2)';
+              const c1 = hm.midday?.level  ? moodColor(hm.midday.level)  : 'var(--surface-2)';
+              const c2 = hm.evening?.level ? moodColor(hm.evening.level) : 'var(--surface-2)';
               return (
                 <div key={key} className="flex-1 flex flex-col items-center gap-1">
                   <span className="text-[10.5px] text-text-3">{DAY_ABBR[dd.getDay()]}</span>
-                  <div className={`w-full rounded-[8px] overflow-hidden flex flex-col cursor-pointer ${isSel ? 'ring-2 ring-accent ring-offset-1 ring-offset-surface' : ''}`}
-                    style={{ height: 64 }} title={dd.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}>
-                    {SEGMENTS.map((s) => (
-                      <span key={s.id} className="flex-1" style={{ background: hm[s.id]?.level ? moodColor(hm[s.id].level) : 'var(--surface-2)' }} />
-                    ))}
-                  </div>
+                  <div onClick={() => setSelDay(key)}
+                    className={`w-full rounded-[8px] cursor-pointer hover:opacity-80 transition-opacity ${isSel ? 'ring-2 ring-accent ring-offset-1 ring-offset-surface' : ''}`}
+                    style={{ height: 64, background: `linear-gradient(to bottom, ${c0}, ${c1}, ${c2})` }}
+                    title={dd.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} />
                   <span className={`text-[11px] ${isT ? 'font-semibold text-text' : 'text-text-3'}`}>{dd.getDate()}</span>
                 </div>
               );
@@ -1089,8 +1183,89 @@ export function Doodle({ doodles, setDoodles, now }) {
 }
 
 /* ─────────────────────────────────────────────────────────────
-   Focus Timer (Pomodoro)
+   Focus Timer (Pomodoro) — slot-drum redesign
 ───────────────────────────────────────────────────────────── */
+
+const FD = { H: 116, FS: 100 };
+
+function FocusResetIcon({ size = 16 }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none"
+      stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <polyline points="1 4 1 10 7 10" />
+      <path d="M3.51 15a9 9 0 1 0 .49-4.95" />
+    </svg>
+  );
+}
+function FocusPlayIcon({ size = 16 }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="currentColor">
+      <polygon points="5 3 19 12 5 21 5 3" />
+    </svg>
+  );
+}
+function FocusPauseIcon({ size = 16 }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none"
+      stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
+      <line x1="6" y1="4" x2="6" y2="20" />
+      <line x1="18" y1="4" x2="18" y2="20" />
+    </svg>
+  );
+}
+function FocusSkipIcon({ size = 16 }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 16 16" fill="none"
+      stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <polyline points="5,3 11,8 5,13" />
+    </svg>
+  );
+}
+
+function FlipDigit({ value }) {
+  const [shown, setShown] = useState(value);
+  const [anim, setAnim]   = useState(null);
+  const t1 = useRef(null);
+  const t2 = useRef(null);
+
+  useEffect(() => {
+    if (value === shown) return;
+    clearTimeout(t1.current); clearTimeout(t2.current);
+    const next = value;
+    setAnim('out');
+    t1.current = setTimeout(() => {
+      setShown(next);
+      setAnim('in');
+      t2.current = setTimeout(() => setAnim(null), 240);
+    }, 190);
+    return () => { clearTimeout(t1.current); clearTimeout(t2.current); };
+  }, [value]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  return (
+    <div style={{
+      height: FD.H,
+      display: 'flex', alignItems: 'center', justifyContent: 'center',
+      flexShrink: 0, userSelect: 'none',
+      maskImage: 'linear-gradient(to bottom, transparent 0%, black 20%, black 80%, transparent 100%)',
+      WebkitMaskImage: 'linear-gradient(to bottom, transparent 0%, black 20%, black 80%, transparent 100%)',
+    }}>
+      <span style={{
+        fontSize: FD.FS, fontWeight: 900,
+        color: 'var(--text)',
+        fontVariantNumeric: 'tabular-nums',
+        fontFeatureSettings: '"tnum"',
+        letterSpacing: '-0.03em',
+        lineHeight: 1,
+        animation: anim === 'out' ? 'focus-digit-out 0.19s ease-in forwards'
+                 : anim === 'in'  ? 'focus-digit-in 0.24s ease-out forwards'
+                 : 'none',
+      }}>
+        {shown}
+      </span>
+    </div>
+  );
+}
+
 export function FocusTile({ pomodoroLog = [], onLogSession }) {
   const [workMins, setWorkMins]   = useState(25);
   const [breakMins, setBreakMins] = useState(5);
@@ -1101,14 +1276,12 @@ export function FocusTile({ pomodoroLog = [], onLogSession }) {
 
   const totalSecs = mode === 'work' ? workMins * 60 : breakMins * 60;
 
-  // countdown tick
   useEffect(() => {
     if (!running) return;
     const id = setInterval(() => setSecsLeft((s) => Math.max(0, s - 1)), 1000);
     return () => clearInterval(id);
   }, [running]);
 
-  // session complete
   useEffect(() => {
     if (secsLeft > 0 || !running) return;
     setRunning(false);
@@ -1139,10 +1312,6 @@ export function FocusTile({ pomodoroLog = [], onLogSession }) {
   const today = ymd(new Date());
   const todaySessions = pomodoroLog.filter((l) => l.date === today).length;
 
-  const SZ = 132, R = 50;
-  const C  = +(2 * Math.PI * R).toFixed(2);
-  const offset = C * (1 - secsLeft / Math.max(1, totalSecs));
-
   return (
     <Card>
       <Head title="Focus" right={
@@ -1172,39 +1341,32 @@ export function FocusTile({ pomodoroLog = [], onLogSession }) {
         </div>
       ) : (
         <>
-          {/* SVG ring + time */}
-          <div className="flex justify-center my-1">
-            <div className="relative flex items-center justify-center" style={{ width: SZ, height: SZ }}>
-              <svg width={SZ} height={SZ} className="absolute inset-0" style={{ transform: 'rotate(-90deg)' }}>
-                <circle cx={SZ / 2} cy={SZ / 2} r={R} fill="none" stroke="var(--stroke)" strokeWidth="3.5" />
-                <circle cx={SZ / 2} cy={SZ / 2} r={R} fill="none"
-                  stroke={mode === 'work' ? 'var(--accent)' : 'var(--text-3)'}
-                  strokeWidth="3.5" strokeLinecap="round"
-                  strokeDasharray={C} strokeDashoffset={offset}
-                  style={{ transition: running ? 'stroke-dashoffset 1s linear' : 'none' }}
-                />
-              </svg>
-              <div className="text-center z-10">
-                <div className="text-[28px] font-semibold tracking-tight text-text leading-none tabular-nums">
-                  {mm}:{ss}
-                </div>
-                <div className="text-[10px] uppercase tracking-widest text-text-3 mt-1">
-                  {mode === 'work' ? 'Focus' : 'Break'}
-                </div>
-              </div>
+          {/* digit display */}
+          <div className="flex items-center justify-center mb-5">
+            <FlipDigit value={mm[0]} />
+            <FlipDigit value={mm[1]} />
+            <div className="flex flex-col mx-3" style={{ gap: 11, alignSelf: 'center' }}>
+              <div style={{ width: 6, height: 6, borderRadius: '50%', background: 'var(--text-3)' }} />
+              <div style={{ width: 6, height: 6, borderRadius: '50%', background: 'var(--text-3)' }} />
             </div>
+            <FlipDigit value={ss[0]} />
+            <FlipDigit value={ss[1]} />
           </div>
 
           {/* controls */}
           <div className="flex items-center justify-center gap-3 mb-4">
             <button onClick={reset}
-              className="w-8 h-8 rounded-full border border-stroke text-text-3 hover:text-text flex items-center justify-center text-base transition-colors">↺</button>
+              className="w-9 h-9 rounded-full border border-stroke text-text-3 hover:text-text grid place-items-center transition-colors">
+              <FocusResetIcon size={15} />
+            </button>
             <button onClick={toggle}
-              className="w-11 h-11 rounded-full bg-text text-canvas flex items-center justify-center text-base hover:opacity-75 transition-opacity">
-              {running ? '⏸' : '▶'}
+              className="w-12 h-12 rounded-full bg-text text-canvas grid place-items-center hover:opacity-80 transition-opacity">
+              {running ? <FocusPauseIcon size={16} /> : <FocusPlayIcon size={16} />}
             </button>
             <button onClick={skip}
-              className="w-8 h-8 rounded-full border border-stroke text-text-3 hover:text-text flex items-center justify-center text-sm transition-colors">⏭</button>
+              className="w-9 h-9 rounded-full border border-stroke text-text-3 hover:text-text grid place-items-center transition-colors">
+              <FocusSkipIcon size={15} />
+            </button>
           </div>
 
           {/* session dots */}
@@ -1234,18 +1396,14 @@ export function ProjectsTile({ projects = [], onAdd, onUpdate, onDelete }) {
   const [expandedId, setExpandedId] = useState(null);
   const [addingProject, setAddingProject] = useState(false);
   const [projDraft, setProjDraft] = useState('');
+  const [projColor, setProjColor] = useState(PRJ_COLORS[0]);
   const [taskDrafts, setTaskDrafts] = useState({});
 
   const submitProject = () => {
     if (!projDraft.trim()) return;
-    onAdd({
-      id: Date.now().toString(),
-      name: projDraft.trim(),
-      color: PRJ_COLORS[projects.length % PRJ_COLORS.length],
-      status: 'active',
-      tasks: [],
-    });
+    onAdd({ id: Date.now().toString(), name: projDraft.trim(), color: projColor, status: 'active', tasks: [] });
     setProjDraft('');
+    setProjColor(PRJ_COLORS[0]);
     setAddingProject(false);
   };
 
@@ -1286,13 +1444,20 @@ export function ProjectsTile({ projects = [], onAdd, onUpdate, onDelete }) {
       } />
 
       {addingProject && (
-        <div className="flex gap-2 mb-4">
+        <div className="flex flex-col gap-2 mb-4">
           <input autoFocus value={projDraft} onChange={(e) => setProjDraft(e.target.value)}
             onKeyDown={(e) => { if (e.key === 'Enter') submitProject(); if (e.key === 'Escape') setAddingProject(false); }}
             placeholder="Project name…"
-            className="flex-1 text-sm bg-surface-2 border border-stroke rounded-xl px-3 py-2 outline-none placeholder:text-text-3" />
+            className="w-full text-sm bg-surface-2 border border-stroke rounded-xl px-3 py-2 outline-none placeholder:text-text-3" />
+          <div className="flex items-center gap-1.5 flex-wrap">
+            {PRJ_COLORS.map((c) => (
+              <button key={c} onClick={() => setProjColor(c)}
+                className="w-5 h-5 rounded-full transition-transform hover:scale-110 shrink-0"
+                style={{ background: c, outline: projColor === c ? '2px solid var(--text)' : 'none', outlineOffset: 2 }} />
+            ))}
+          </div>
           <button onClick={submitProject}
-            className="px-3 py-2 bg-text text-canvas rounded-xl text-[12px] font-medium">Add</button>
+            className="w-full py-2 bg-text text-canvas rounded-xl text-[12px] font-medium">Add project</button>
         </div>
       )}
 
@@ -1537,8 +1702,7 @@ export function TripTile({ trip, onSet, onUpdate, onClear }) {
           <div className="flex flex-col gap-2.5">
             <input autoFocus value={form.destination} onChange={(e) => setForm((f) => ({ ...f, destination: e.target.value }))}
               placeholder="Destination" className="text-sm bg-surface-2 border border-stroke rounded-xl px-3 py-2 outline-none placeholder:text-text-3" />
-            <input type="date" value={form.date} onChange={(e) => setForm((f) => ({ ...f, date: e.target.value }))}
-              className="text-sm bg-surface-2 border border-stroke rounded-xl px-3 py-2 outline-none text-text" />
+            <DatePicker value={form.date} onChange={(v) => setForm((f) => ({ ...f, date: v }))} />
             <button onClick={submitTrip}
               className="w-full py-2.5 rounded-xl bg-text text-canvas text-[13px] font-medium hover:opacity-75 transition-opacity">
               Set trip
@@ -1606,6 +1770,722 @@ export function TripTile({ trip, onSet, onUpdate, onClear }) {
           <Plus size={13} />
         </button>
       </div>
+    </Card>
+  );
+}
+
+/* ─────────────────────────────────────────────────────────────
+   World Clock
+───────────────────────────────────────────────────────────── */
+const COMMON_TZS = [
+  ['Europe/Madrid',        'Madrid'],
+  ['America/New_York',     'New York'],
+  ['America/Los_Angeles',  'Los Angeles'],
+  ['America/Chicago',      'Chicago'],
+  ['Europe/London',        'London'],
+  ['Europe/Paris',         'Paris'],
+  ['Asia/Tokyo',           'Tokyo'],
+  ['Asia/Shanghai',        'Shanghai'],
+  ['Australia/Sydney',     'Sydney'],
+  ['America/Sao_Paulo',    'São Paulo'],
+  ['Asia/Dubai',           'Dubai'],
+  ['Asia/Kolkata',         'Mumbai'],
+];
+
+function formatTime(tz) {
+  try {
+    return new Intl.DateTimeFormat('en-GB', {
+      timeZone: tz, hour: '2-digit', minute: '2-digit', hour12: false,
+    }).format(new Date());
+  } catch { return '--:--'; }
+}
+
+function formatOffset(tz) {
+  try {
+    const s = new Intl.DateTimeFormat('en', {
+      timeZone: tz, timeZoneName: 'shortOffset',
+    }).formatToParts(new Date()).find((p) => p.type === 'timeZoneName')?.value ?? '';
+    return s.replace('GMT', 'UTC');
+  } catch { return ''; }
+}
+
+function getTzParts(tz) {
+  try {
+    const parts = new Intl.DateTimeFormat('en', {
+      timeZone: tz, hour: 'numeric', minute: 'numeric', second: 'numeric', hour12: false,
+    }).formatToParts(new Date());
+    const get = (t) => +parts.find((p) => p.type === t)?.value || 0;
+    return { h: get('hour') % 12, m: get('minute'), s: get('second') };
+  } catch { return { h: 0, m: 0, s: 0 }; }
+}
+
+/* Analog clock SVG face */
+function AnalogFace({ clock, size = 220 }) {
+  const { h, m, s } = getTzParts(clock?.tz ?? 'UTC');
+  const cx = size / 2, cy = size / 2, r = size / 2 - 6;
+  const deg = (angle) => (angle - 90) * (Math.PI / 180);
+  const pt  = (angle, len) => ({
+    x: cx + len * Math.cos(deg(angle)),
+    y: cy + len * Math.sin(deg(angle)),
+  });
+
+  const secDeg = s * 6;
+  const minDeg = m * 6 + s * 0.1;
+  const hrDeg  = h * 30 + m * 0.5;
+
+  const minEnd = pt(minDeg, r * 0.68);
+  const hrEnd  = pt(hrDeg,  r * 0.48);
+  const secEnd = pt(secDeg, r * 0.76);
+  const secTail = pt(secDeg + 180, r * 0.14);
+
+  const ticks = Array.from({ length: 60 }, (_, i) => {
+    const a = i * 6;
+    const isHour = i % 5 === 0;
+    const outer = r + 2;
+    const inner = isHour ? r - 10 : r - 5;
+    return { p1: pt(a, inner), p2: pt(a, outer), isHour };
+  });
+
+  return (
+    <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`} style={{ display: 'block' }}>
+      {/* Face */}
+      <circle cx={cx} cy={cy} r={r + 4} fill="var(--surface)" />
+      {/* Ticks */}
+      {ticks.map((t, i) => (
+        <line key={i} x1={t.p1.x} y1={t.p1.y} x2={t.p2.x} y2={t.p2.y}
+          stroke="var(--text)" strokeOpacity={t.isHour ? 0.22 : 0.1}
+          strokeWidth={t.isHour ? 1.5 : 0.8} strokeLinecap="round" />
+      ))}
+      {/* Hour hand */}
+      <line x1={cx} y1={cy} x2={hrEnd.x} y2={hrEnd.y}
+        stroke="var(--text)" strokeWidth={2.8} strokeLinecap="round" />
+      {/* Minute hand */}
+      <line x1={cx} y1={cy} x2={minEnd.x} y2={minEnd.y}
+        stroke="var(--text)" strokeWidth={1.5} strokeLinecap="round" strokeOpacity={0.85} />
+      {/* Second hand */}
+      <line x1={secTail.x} y1={secTail.y} x2={secEnd.x} y2={secEnd.y}
+        stroke="#c0564b" strokeWidth={0.9} strokeLinecap="round" />
+      {/* Center */}
+      <circle cx={cx} cy={cy} r={3.5} fill="var(--text)" />
+      <circle cx={cx} cy={cy} r={1.8} fill="#c0564b" />
+    </svg>
+  );
+}
+
+/* Orb clock — warm gradient blob with subtle hands */
+function OrbFace({ clock, size = 260 }) {
+  const { h, m } = getTzParts(clock?.tz ?? 'UTC');
+  const cx = size / 2, cy = size / 2, r = size / 2 - 8;
+  const deg = (angle) => (angle - 90) * (Math.PI / 180);
+  const pt  = (angle, len) => ({
+    x: cx + len * Math.cos(deg(angle)),
+    y: cy + len * Math.sin(deg(angle)),
+  });
+
+  const minDeg = m * 6;
+  const hrDeg  = h * 30 + m * 0.5;
+  const minEnd = pt(minDeg, r * 0.62);
+  const hrEnd  = pt(hrDeg,  r * 0.42);
+  const uid    = clock?.id ?? 'orb';
+
+  return (
+    <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`} style={{ display: 'block' }}>
+      <defs>
+        <radialGradient id={`og-${uid}`} cx="48%" cy="46%" r="55%">
+          <stop offset="0%"   stopColor="#b83220" stopOpacity="0.96" />
+          <stop offset="28%"  stopColor="#d94020" stopOpacity="0.92" />
+          <stop offset="58%"  stopColor="#f97316" stopOpacity="0.82" />
+          <stop offset="88%"  stopColor="#ffb347" stopOpacity="0.45" />
+          <stop offset="100%" stopColor="#fdf8f3"  stopOpacity="0" />
+        </radialGradient>
+        <filter id={`on-${uid}`}>
+          <feTurbulence type="fractalNoise" baseFrequency="0.72" numOctaves="4" seed="3" result="noise" />
+          <feColorMatrix in="noise" type="matrix"
+            values="0 0 0 0 0  0 0 0 0 0  0 0 0 0 0  0 0 0 0.07 0" result="noiseMask" />
+          <feComposite in="noiseMask" in2="SourceGraphic" operator="in" result="masked" />
+          <feBlend in="SourceGraphic" in2="masked" mode="overlay" />
+        </filter>
+      </defs>
+      <rect width={size} height={size} fill="var(--surface)" />
+      {/* Orb */}
+      <circle cx={cx} cy={cy} r={r * 0.72} fill={`url(#og-${uid})`} filter={`url(#on-${uid})`} />
+      {/* Hour hand */}
+      <line x1={cx} y1={cy} x2={hrEnd.x} y2={hrEnd.y}
+        stroke="rgba(255,255,255,0.55)" strokeWidth={1.8} strokeLinecap="round" />
+      {/* Minute hand */}
+      <line x1={cx} y1={cy} x2={minEnd.x} y2={minEnd.y}
+        stroke="rgba(255,255,255,0.45)" strokeWidth={1.1} strokeLinecap="round" />
+      {/* Center dot */}
+      <circle cx={cx} cy={cy} r={2.5} fill="rgba(255,255,255,0.7)" />
+    </svg>
+  );
+}
+
+/* Face toggle button row */
+const FACE_OPTS = [
+  { id: 'list',
+    icon: <svg width="11" height="11" viewBox="0 0 11 11" fill="none"><rect y="1" width="11" height="1.5" rx="0.75" fill="currentColor"/><rect y="4.75" width="11" height="1.5" rx="0.75" fill="currentColor"/><rect y="8.5" width="11" height="1.5" rx="0.75" fill="currentColor"/></svg> },
+  { id: 'analog',
+    icon: <svg width="11" height="11" viewBox="0 0 11 11" fill="none"><circle cx="5.5" cy="5.5" r="4.5" stroke="currentColor" strokeWidth="1.1"/><line x1="5.5" y1="5.5" x2="5.5" y2="2.5" stroke="currentColor" strokeWidth="1.1" strokeLinecap="round"/><line x1="5.5" y1="5.5" x2="7.5" y2="5.5" stroke="currentColor" strokeWidth="1.1" strokeLinecap="round"/></svg> },
+  { id: 'orb',
+    icon: <svg width="11" height="11" viewBox="0 0 11 11"><defs><radialGradient id="tg" cx="40%" cy="38%" r="60%"><stop offset="0%" stopColor="#c0392b"/><stop offset="60%" stopColor="#f97316"/><stop offset="100%" stopColor="#f97316" stopOpacity="0"/></radialGradient></defs><circle cx="5.5" cy="5.5" r="4.5" fill="url(#tg)"/></svg> },
+];
+
+export function WorldClockTile({ clocks, setClocks, clockFace = 'list', setClockFace }) {
+  const [, setTick] = useState(0);
+  const [adding, setAdding] = useState(false);
+  const [selTz, setSelTz] = useState(COMMON_TZS[0][0]);
+  const [activeIdx, setActiveIdx] = useState(0);
+
+  useEffect(() => {
+    const id = setInterval(() => setTick((t) => t + 1), 1000);
+    return () => clearInterval(id);
+  }, []);
+
+  const addClock = () => {
+    if (clocks.some((c) => c.tz === selTz)) return;
+    const label = COMMON_TZS.find(([tz]) => tz === selTz)?.[1] ?? selTz;
+    setClocks([...clocks, { id: `c${Date.now()}`, city: label, tz: selTz }]);
+    setAdding(false);
+  };
+
+  const removeClock = (id) => setClocks(clocks.filter((c) => c.id !== id));
+
+  const activeClock = clocks[activeIdx % Math.max(1, clocks.length)];
+  const cycleCity = () => {
+    if (clocks.length > 1) setActiveIdx((i) => (i + 1) % clocks.length);
+  };
+
+  const faceToggle = (
+    <div className="flex items-center bg-surface-3 rounded-full p-0.5 gap-0.5">
+      {FACE_OPTS.map(({ id, icon }) => (
+        <button key={id} onClick={() => setClockFace?.(id)}
+          title={id}
+          className={`w-6 h-6 flex items-center justify-center rounded-full transition-all
+            ${clockFace === id
+              ? 'bg-surface text-text shadow-sm'
+              : 'text-text-3 hover:text-text-2'}`}>
+          {icon}
+        </button>
+      ))}
+    </div>
+  );
+
+  if (clockFace === 'analog') {
+    return (
+      <Card className="relative overflow-hidden">
+        <div className="absolute top-[18px] right-[18px] z-10 flex items-center gap-2">
+          {faceToggle}
+        </div>
+        {clocks.length === 0 ? (
+          <p className="text-[13px] text-text-3 py-4 text-center">Add a clock in list mode first.</p>
+        ) : (
+          <div className="flex flex-col items-center gap-3 pt-1 pb-1">
+            <div onClick={cycleCity} className={clocks.length > 1 ? 'cursor-pointer' : ''}>
+              <AnalogFace clock={activeClock} size={200} />
+            </div>
+            <div className="text-center">
+              <div className="text-[14px] font-medium text-text">{activeClock?.city}</div>
+              <div className="text-[11px] text-text-3">{formatOffset(activeClock?.tz)}</div>
+              {clocks.length > 1 && (
+                <div className="text-[10px] text-text-3 mt-0.5 opacity-60">tap to cycle</div>
+              )}
+            </div>
+          </div>
+        )}
+      </Card>
+    );
+  }
+
+  if (clockFace === 'orb') {
+    return (
+      <section className="rounded-card shadow-sm relative overflow-hidden" style={{ background: 'var(--surface)' }}>
+        <div className="absolute top-[14px] right-[14px] z-10 flex items-center gap-2">
+          {faceToggle}
+        </div>
+        {clocks.length === 0 ? (
+          <p className="text-[13px] text-text-3 py-8 text-center">Add a clock in list mode first.</p>
+        ) : (
+          <div className="flex flex-col items-center" onClick={cycleCity}
+            style={{ cursor: clocks.length > 1 ? 'pointer' : 'default' }}>
+            <OrbFace clock={activeClock} size={260} />
+            <div className="absolute bottom-4 left-0 right-0 text-center pointer-events-none">
+              <div className="text-[13px] font-medium text-text-2">{activeClock?.city}</div>
+              <div className="text-[11px] text-text-3">{formatTime(activeClock?.tz)}</div>
+            </div>
+          </div>
+        )}
+      </section>
+    );
+  }
+
+  /* ── list mode (default) ── */
+  return (
+    <Card>
+      <Head
+        title="World clock"
+        right={
+          <div className="flex items-center gap-2">
+            {faceToggle}
+            <button onClick={() => setAdding((v) => !v)}
+              className="w-7 h-7 rounded-full bg-surface-2 border border-stroke flex items-center justify-center
+                text-text-3 hover:text-text transition-colors">
+              <Plus size={12} />
+            </button>
+          </div>
+        }
+      />
+
+      {adding && (
+        <div className="flex gap-2 mb-4">
+          <select value={selTz} onChange={(e) => setSelTz(e.target.value)}
+            className="flex-1 text-sm bg-surface-2 border border-stroke rounded-xl px-3 py-2 outline-none text-text">
+            {COMMON_TZS.filter(([tz]) => !clocks.some((c) => c.tz === tz)).map(([tz, lbl]) => (
+              <option key={tz} value={tz}>{lbl}</option>
+            ))}
+          </select>
+          <button onClick={addClock}
+            className="w-9 h-9 rounded-xl bg-text text-canvas flex items-center justify-center shrink-0">
+            <Plus size={13} />
+          </button>
+        </div>
+      )}
+
+      <div className="flex flex-col divide-y divide-stroke">
+        {clocks.map((c) => (
+          <div key={c.id} className="group flex items-center justify-between py-3 first:pt-0 last:pb-0">
+            <div className="flex items-center gap-2.5">
+              <Globe size={13} className="text-text-3 shrink-0" />
+              <div>
+                <div className="text-[13px] font-medium text-text leading-tight">{c.city}</div>
+                <div className="text-[11px] text-text-3">{formatOffset(c.tz)}</div>
+              </div>
+            </div>
+            <div className="flex items-center gap-3">
+              <span className="text-[22px] font-semibold tracking-tight tabular-nums text-text">
+                {formatTime(c.tz)}
+              </span>
+              <button onClick={() => removeClock(c.id)}
+                className="opacity-0 group-hover:opacity-100 text-text-3 hover:text-red-400 transition-all">
+                <X size={12} />
+              </button>
+            </div>
+          </div>
+        ))}
+        {clocks.length === 0 && (
+          <p className="text-[13px] text-text-3 py-2">No clocks yet. Add one above.</p>
+        )}
+      </div>
+    </Card>
+  );
+}
+
+/* ─────────────────────────────────────────────────────────────
+   Inspiration Links
+───────────────────────────────────────────────────────────── */
+function getDomain(url) {
+  try { return new URL(url).hostname.replace(/^www\./, ''); }
+  catch { return url; }
+}
+
+export function InspoLinksTile({ links, setLinks }) {
+  const [draft, setDraft]     = useState('');
+  const [titleDraft, setTitle] = useState('');
+  const [adding, setAdding]   = useState(false);
+
+  const addLink = () => {
+    const url = draft.trim();
+    if (!url) return;
+    const title = titleDraft.trim() || getDomain(url);
+    setLinks([...links, { id: `l${Date.now()}`, url, title }]);
+    setDraft('');
+    setTitle('');
+    setAdding(false);
+  };
+
+  const removeLink = (id) => setLinks(links.filter((l) => l.id !== id));
+
+  const open = (url) => window.lumen?.openExternal?.(url);
+
+  return (
+    <Card>
+      <Head
+        title="Inspiration"
+        right={
+          <button onClick={() => setAdding((v) => !v)}
+            className="w-7 h-7 rounded-full bg-surface-2 border border-stroke flex items-center justify-center
+              text-text-3 hover:text-text transition-colors">
+            <Plus size={12} />
+          </button>
+        }
+      />
+
+      {adding && (
+        <div className="flex flex-col gap-2 mb-4">
+          <input value={draft} onChange={(e) => setDraft(e.target.value)}
+            onKeyDown={(e) => e.key === 'Enter' && addLink()}
+            placeholder="https://…"
+            className="text-sm bg-surface-2 border border-stroke rounded-xl px-3 py-2 outline-none placeholder:text-text-3" />
+          <div className="flex gap-2">
+            <input value={titleDraft} onChange={(e) => setTitle(e.target.value)}
+              onKeyDown={(e) => e.key === 'Enter' && addLink()}
+              placeholder="Title (optional)"
+              className="flex-1 text-sm bg-surface-2 border border-stroke rounded-xl px-3 py-2 outline-none placeholder:text-text-3" />
+            <button onClick={addLink}
+              className="w-9 h-9 rounded-xl bg-text text-canvas flex items-center justify-center shrink-0">
+              <Plus size={13} />
+            </button>
+          </div>
+        </div>
+      )}
+
+      <div className="flex flex-col gap-1">
+        {links.map((l) => (
+          <div key={l.id}
+            className="group flex items-center gap-2.5 px-2 py-2 rounded-xl hover:bg-surface-2 transition-colors">
+            <Link2 size={12} className="text-text-3 shrink-0" />
+            <div className="flex-1 min-w-0">
+              <div className="text-[13px] font-medium text-text truncate leading-tight">{l.title}</div>
+              <div className="text-[11px] text-text-3 truncate">{getDomain(l.url)}</div>
+            </div>
+            <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity shrink-0">
+              <button onClick={() => open(l.url)}
+                className="text-text-3 hover:text-accent transition-colors p-0.5">
+                <ExternalLink size={12} />
+              </button>
+              <button onClick={() => removeLink(l.id)}
+                className="text-text-3 hover:text-red-400 transition-colors p-0.5">
+                <X size={12} />
+              </button>
+            </div>
+          </div>
+        ))}
+        {links.length === 0 && (
+          <p className="text-[13px] text-text-3 py-1">No links yet.</p>
+        )}
+      </div>
+    </Card>
+  );
+}
+
+/* ─────────────────────────────────────────────────────────────
+   Plant Tracker
+───────────────────────────────────────────────────────────── */
+const PLANT_COLORS = ['#4ade80', '#86efac', '#bbf7d0', '#fbbf24', '#f97316', '#f87171'];
+const WATER_INTERVALS = [
+  { days: 2,  label: 'Every 2 days' },
+  { days: 3,  label: 'Every 3 days' },
+  { days: 5,  label: 'Every 5 days' },
+  { days: 7,  label: 'Every week' },
+  { days: 10, label: 'Every 10 days' },
+  { days: 14, label: 'Every 2 weeks' },
+  { days: 21, label: 'Every 3 weeks' },
+  { days: 30, label: 'Every month' },
+];
+
+function plantWaterStatus(plant) {
+  const { lastWatered, intervalDays = 7 } = plant;
+  if (!lastWatered) return { color: 'var(--text-3)', label: 'Never watered', urgent: false };
+
+  const daysSince = (Date.now() - new Date(lastWatered).getTime()) / 86400000;
+  const daysLeft  = Math.round(intervalDays - daysSince);
+
+  if (daysLeft > 1)  return { color: '#22c55e', label: `Next watering in ${daysLeft}d`, urgent: false };
+  if (daysLeft === 1) return { color: '#f59e0b', label: 'Water tomorrow', urgent: false };
+  if (daysLeft === 0) return { color: '#f59e0b', label: 'Water today', urgent: true };
+  return { color: '#ef4444', label: `Overdue by ${Math.abs(daysLeft)}d`, urgent: true };
+}
+
+export function PlantTrackerTile({ plants, setPlants }) {
+  const [adding, setAdding]       = useState(false);
+  const [nameDraft, setName]       = useState('');
+  const [plantColor, setPlantColor] = useState(PLANT_COLORS[0]);
+  const [interval, setInterval]    = useState(7);
+
+  const addPlant = () => {
+    const name = nameDraft.trim();
+    if (!name) return;
+    setPlants([...plants, {
+      id: `p${Date.now()}`, name, color: plantColor,
+      intervalDays: interval, lastWatered: null,
+    }]);
+    setName('');
+    setPlantColor(PLANT_COLORS[0]);
+    setInterval(7);
+    setAdding(false);
+  };
+
+  const water = (id) =>
+    setPlants(plants.map((p) => p.id === id ? { ...p, lastWatered: new Date().toISOString() } : p));
+
+  const removePlant = (id) => setPlants(plants.filter((p) => p.id !== id));
+
+  return (
+    <Card>
+      <Head
+        title="Plants"
+        right={
+          <button onClick={() => setAdding((v) => !v)}
+            className="w-7 h-7 rounded-full bg-surface-2 border border-stroke flex items-center justify-center
+              text-text-3 hover:text-text transition-colors">
+            <Plus size={12} />
+          </button>
+        }
+      />
+
+      {adding && (
+        <div className="flex flex-col gap-2 mb-4">
+          <input value={nameDraft} onChange={(e) => setName(e.target.value)}
+            onKeyDown={(e) => e.key === 'Enter' && addPlant()}
+            placeholder="Plant name…"
+            className="text-sm bg-surface-2 border border-stroke rounded-xl px-3 py-2 outline-none placeholder:text-text-3" />
+          <div className="flex gap-2 items-center">
+            <select value={interval} onChange={(e) => setInterval(Number(e.target.value))}
+              className="flex-1 text-sm bg-surface-2 border border-stroke rounded-xl px-3 py-2 outline-none text-text">
+              {WATER_INTERVALS.map(({ days, label }) => (
+                <option key={days} value={days}>{label}</option>
+              ))}
+            </select>
+            <button onClick={addPlant}
+              className="w-9 h-9 rounded-xl bg-text text-canvas flex items-center justify-center shrink-0">
+              <Plus size={13} />
+            </button>
+          </div>
+          <div className="flex gap-1.5 items-center">
+            {PLANT_COLORS.map((c) => (
+              <button key={c} onClick={() => setPlantColor(c)}
+                className="w-5 h-5 rounded-full transition-transform hover:scale-110 shrink-0"
+                style={{ background: c, outline: plantColor === c ? '2px solid var(--text)' : 'none', outlineOffset: 2 }} />
+            ))}
+          </div>
+        </div>
+      )}
+
+      <div className="flex flex-col gap-1">
+        {plants.map((p) => {
+          const status = plantWaterStatus(p);
+          return (
+            <div key={p.id}
+              className="group flex items-center gap-3 px-2 py-2.5 rounded-xl hover:bg-surface-2 transition-colors">
+              <div className="w-3 h-3 rounded-full shrink-0" style={{ background: p.color ?? '#4ade80' }} />
+              <div className="flex-1 min-w-0">
+                <div className="text-[13px] font-medium text-text leading-tight">{p.name}</div>
+                <div className="text-[11px] truncate" style={{ color: status.color }}>{status.label}</div>
+              </div>
+              <div className="flex items-center gap-1 shrink-0">
+                <button onClick={() => water(p.id)}
+                  className={`flex items-center gap-1 text-[11px] px-2 py-1 rounded-lg transition-colors
+                    ${status.urgent
+                      ? 'bg-[#dbeafe] text-[#2563eb] hover:bg-[#bfdbfe]'
+                      : 'bg-surface-3 text-text-2 hover:bg-accent-tint hover:text-accent-text'}`}>
+                  <Droplets size={10} />
+                  Water
+                </button>
+                <button onClick={() => removePlant(p.id)}
+                  className="opacity-0 group-hover:opacity-100 text-text-3 hover:text-red-400 transition-all p-0.5">
+                  <X size={12} />
+                </button>
+              </div>
+            </div>
+          );
+        })}
+        {plants.length === 0 && (
+          <p className="text-[13px] text-text-3 py-1">No plants yet.</p>
+        )}
+      </div>
+    </Card>
+  );
+}
+
+/* ─────────────────────────────────────────────────────────────
+   Social Planner
+───────────────────────────────────────────────────────────── */
+const SOCIAL_NETWORKS = {
+  instagram: { label: 'Instagram', short: 'IG', color: '#C13584', types: ['Post', 'Reel', 'Carousel'] },
+  x:         { label: 'X',         short: 'X',  color: '#14171A', types: ['Text', 'Images'] },
+  youtube:   { label: 'YouTube',   short: 'YT', color: '#FF0000', types: ['Video', 'Short'] },
+  tiktok:    { label: 'TikTok',    short: 'TT', color: '#010101', types: ['Video'] },
+};
+const TYPE_COLORS = {
+  'Reel':     { bg: '#F0E6E6', text: '#8C4040' },
+  'Carousel': { bg: '#E6ECF5', text: '#3D5C8A' },
+  'Post':     { bg: '#F5EFD8', text: '#7A6020' },
+  'Text':     { bg: '#E6EEEA', text: '#2E6B50' },
+  'Images':   { bg: '#EDE8F5', text: '#5C4480' },
+  'Video':    { bg: '#F2EAE2', text: '#7A4E28' },
+  'Short':    { bg: '#E4EFF0', text: '#2A6870' },
+};
+const ALL_NETS  = ['instagram', 'x', 'youtube', 'tiktok'];
+const SOC_STATS = [
+  { id: 'idea',   label: 'Idea',   color: 'var(--text-3)' },
+  { id: 'draft',  label: 'Draft',  color: '#d97706' },
+  { id: 'ready',  label: 'Ready',  color: '#22c55e' },
+  { id: 'posted', label: 'Posted', color: 'var(--text-3)' },
+];
+
+export function SocialPlannerTile({ planner, setPlanner }) {
+  const enabledNets = planner?.enabledNetworks ?? ['instagram', 'x'];
+  const posts       = planner?.posts ?? [];
+
+  const [activeTab,   setActiveTab]   = useState(enabledNets[0] ?? 'instagram');
+  const [showPicker,  setShowPicker]  = useState(false);
+  const [adding,      setAdding]      = useState(false);
+  const [titleDraft,  setTitleDraft]  = useState('');
+  const [typeDraft,   setTypeDraft]   = useState('');
+
+  useEffect(() => {
+    if (!enabledNets.includes(activeTab) && enabledNets.length > 0)
+      setActiveTab(enabledNets[0]);
+  }, [enabledNets, activeTab]);
+
+  const update = (changes) => setPlanner({ ...planner, ...changes });
+
+  const toggleNet = (net) => {
+    const next = enabledNets.includes(net)
+      ? enabledNets.filter((n) => n !== net)
+      : ALL_NETS.filter((n) => enabledNets.includes(n) || n === net);
+    if (next.length === 0) return;
+    update({ enabledNetworks: next });
+  };
+
+  const addPost = () => {
+    if (!titleDraft.trim()) return;
+    const net  = SOCIAL_NETWORKS[activeTab];
+    const type = typeDraft || net?.types[0] || '';
+    update({ posts: [...posts, {
+      id: `sp${Date.now()}`, network: activeTab,
+      type, title: titleDraft.trim(), status: 'idea',
+    }]});
+    setTitleDraft(''); setTypeDraft(''); setAdding(false);
+  };
+
+  const removePost  = (id) => update({ posts: posts.filter((p) => p.id !== id) });
+  const cycleStatus = (id) => update({
+    posts: posts.map((p) => {
+      if (p.id !== id) return p;
+      const i = SOC_STATS.findIndex((s) => s.id === p.status);
+      return { ...p, status: SOC_STATS[(i + 1) % SOC_STATS.length].id };
+    }),
+  });
+
+  const net      = SOCIAL_NETWORKS[activeTab];
+  const tabPosts = posts.filter((p) => p.network === activeTab);
+
+  return (
+    <Card>
+      {/* ── header ── */}
+      <div className="flex justify-between items-center mb-4">
+        <div className="text-[15px] font-semibold tracking-tight">Social</div>
+        <div className="relative">
+          <button onClick={() => setShowPicker((v) => !v)}
+            className="w-7 h-7 rounded-full bg-surface-2 border border-stroke flex items-center justify-center text-text-3 hover:text-text transition-colors">
+            <Settings size={12} />
+          </button>
+          {showPicker && (
+            <div className="absolute right-0 top-full mt-1.5 bg-surface border border-stroke rounded-xl shadow-lg p-2 z-20 min-w-[160px]"
+              onMouseLeave={() => setShowPicker(false)}>
+              <div className="text-[10px] uppercase tracking-wider text-text-3 px-2 pb-1.5 font-medium">Networks</div>
+              {ALL_NETS.map((n) => {
+                const active = enabledNets.includes(n);
+                return (
+                  <button key={n} onClick={() => toggleNet(n)}
+                    className="flex items-center gap-2.5 w-full px-2 py-1.5 rounded-lg hover:bg-surface-2 transition-colors">
+                    <div className="w-3.5 h-3.5 rounded-sm border flex items-center justify-center shrink-0 transition-all"
+                      style={{ background: active ? SOCIAL_NETWORKS[n].color : 'transparent', borderColor: active ? SOCIAL_NETWORKS[n].color : 'var(--stroke)' }}>
+                      {active && <Check size={8} className="text-white" />}
+                    </div>
+                    <span className="text-[13px] text-text">{SOCIAL_NETWORKS[n].label}</span>
+                  </button>
+                );
+              })}
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* ── network tabs ── */}
+      <div className="flex gap-1 mb-4 bg-surface-2 rounded-xl p-1">
+        {enabledNets.map((n) => (
+          <button key={n} onClick={() => setActiveTab(n)}
+            className={`flex-1 text-[12px] py-1.5 rounded-lg font-medium transition-all
+              ${activeTab === n ? 'bg-surface text-text shadow-sm' : 'text-text-3 hover:text-text-2'}`}>
+            {SOCIAL_NETWORKS[n].short}
+          </button>
+        ))}
+      </div>
+
+      {/* ── post list ── */}
+      <div key={activeTab} className="tab-content flex flex-col gap-0.5 mb-3" style={{ minHeight: 80 }}>
+        {tabPosts.length === 0 && !adding && (
+          <p className="text-[13px] text-text-3 py-1">Nothing planned for {net?.label}.</p>
+        )}
+        {tabPosts.map((p) => {
+          const st     = SOC_STATS.find((s) => s.id === p.status) ?? SOC_STATS[0];
+          const posted = p.status === 'posted';
+          return (
+            <div key={p.id}
+              className="group flex items-center gap-2.5 px-2 py-2 rounded-xl hover:bg-surface-2 transition-colors">
+              {/* status dot — click cycles */}
+              <button onClick={() => cycleStatus(p.id)} title={st.label}
+                className="w-4 h-4 rounded-full border-[1.5px] shrink-0 flex items-center justify-center transition-all"
+                style={{ borderColor: st.color, background: posted ? st.color : 'transparent' }}>
+                {posted && <Check size={7} style={{ color: 'var(--canvas)' }} />}
+              </button>
+
+              <span className={`flex-1 text-[13px] leading-tight min-w-0 truncate
+                ${posted ? 'line-through text-text-3' : 'text-text'}`}>
+                {p.title}
+              </span>
+
+              <span className="text-[10px] px-1.5 py-0.5 rounded-full shrink-0 font-medium"
+                style={TYPE_COLORS[p.type]
+                  ? { background: TYPE_COLORS[p.type].bg, color: TYPE_COLORS[p.type].text }
+                  : { background: 'var(--surface-3)', color: 'var(--text-3)' }}>
+                {p.type}
+              </span>
+              <span className="text-[10px] px-1.5 py-0.5 rounded-full shrink-0 font-medium"
+                style={{ background: `color-mix(in srgb, ${st.color} 14%, transparent)`, color: st.color }}>
+                {st.label}
+              </span>
+
+              <button onClick={() => removePost(p.id)}
+                className="opacity-0 group-hover:opacity-100 text-text-3 hover:text-red-400 transition-all p-0.5 shrink-0">
+                <X size={12} />
+              </button>
+            </div>
+          );
+        })}
+      </div>
+
+      {/* ── add form ── */}
+      {adding ? (
+        <div className="flex flex-col gap-2">
+          <input value={titleDraft} onChange={(e) => setTitleDraft(e.target.value)}
+            onKeyDown={(e) => e.key === 'Enter' && addPost()} autoFocus
+            placeholder={`New ${net?.label} idea…`}
+            className="text-sm bg-surface-2 border border-stroke rounded-xl px-3 py-2 outline-none placeholder:text-text-3" />
+          <div className="flex gap-1.5 items-center">
+            <div className="flex gap-1 flex-1 flex-wrap">
+              {(net?.types ?? []).map((t) => (
+                <button key={t} onClick={() => setTypeDraft(t)}
+                  className={`text-[12px] px-2.5 py-1 rounded-lg transition-colors
+                    ${(typeDraft || net?.types[0]) === t ? 'bg-text text-canvas' : 'bg-surface-3 text-text-2 hover:bg-surface-2'}`}>
+                  {t}
+                </button>
+              ))}
+            </div>
+            <button onClick={addPost}
+              className="w-8 h-8 rounded-xl bg-text text-canvas flex items-center justify-center shrink-0">
+              <Plus size={13} />
+            </button>
+          </div>
+        </div>
+      ) : (
+        <button onClick={() => setAdding(true)}
+          className="flex items-center gap-1.5 text-[12px] text-text-3 hover:text-text-2 transition-colors w-full px-2 py-1 rounded-xl hover:bg-surface-2">
+          <Plus size={11} /> Add idea
+        </button>
+      )}
     </Card>
   );
 }

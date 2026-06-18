@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { X, Check } from './icons';
+import { X, Check, ImageIcon } from './icons';
 import { ACCENT_PRESETS, ymd } from '../lib/utils';
 
 /* ── helpers ──────────────────────────────────────────────────── */
@@ -205,6 +205,35 @@ function BackupSection({ s }) {
   );
 }
 
+/* ── Background image picker ─────────────────────────────────── */
+function BgPicker({ bg, onSet, onClear }) {
+  const fileRef = useRef();
+  const onFile = (e) => {
+    const f = e.target.files?.[0]; if (!f) return;
+    const r = new FileReader(); r.onload = () => onSet(r.result); r.readAsDataURL(f);
+  };
+  return (
+    <div className="flex items-center gap-2">
+      {bg ? (
+        <>
+          <div className="w-10 h-10 rounded-xl bg-cover bg-center border border-stroke shrink-0"
+            style={{ backgroundImage: `url(${bg})` }} />
+          <button onClick={onClear}
+            className="px-3 py-1.5 rounded-xl bg-surface-2 border border-stroke text-[12.5px] text-text-2 hover:text-text transition-colors">
+            Remove
+          </button>
+        </>
+      ) : (
+        <button onClick={() => fileRef.current.click()}
+          className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-surface-2 border border-stroke text-[12.5px] text-text-2 hover:text-text transition-colors">
+          <ImageIcon size={13} /> Choose image…
+        </button>
+      )}
+      <input ref={fileRef} type="file" accept="image/*" hidden onChange={onFile} />
+    </div>
+  );
+}
+
 /* ── Main SettingsPanel ───────────────────────────────────────── */
 const SECTIONS = [
   { id: 'general',    label: 'General' },
@@ -309,9 +338,9 @@ export default function SettingsPanel({ s, patch, onClose }) {
           {/* ── Appearance ────────────────────────────────────── */}
           {section === 'appearance' && (
             <div>
-              <Row label="Theme" hint="Light or dark mode.">
+              <Row label="Theme" hint="Light, dark, or warm cream.">
                 <Seg
-                  options={[['light', 'Light'], ['dark', 'Dark']]}
+                  options={[['light', 'Light'], ['dark', 'Dark'], ['cream', 'Cream']]}
                   value={s.theme ?? 'light'}
                   onChange={(v) => patch('theme', v)} />
               </Row>
@@ -327,6 +356,10 @@ export default function SettingsPanel({ s, patch, onClose }) {
                     </button>
                   ))}
                 </div>
+              </Row>
+
+              <Row label="Background image" hint="Custom image behind the dashboard tiles.">
+                <BgPicker bg={s.bg} onSet={(v) => patch('bg', v)} onClear={() => patch('bg', null)} />
               </Row>
             </div>
           )}

@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { LANES, STATUSES, bucketOf, dateForLane } from '../lib/utils';
 import { Plus, Check, Trash2, MoreVertical, GripVertical } from './icons';
 
@@ -16,6 +16,23 @@ export default function Focal({
   const [dragId, setDragId] = useState(null);
   const [hoverId, setHoverId] = useState(null);
   const [completedOpen, setCompletedOpen] = useState(false);
+
+  const composerWrapRef = useRef(null);
+  const ringRef = useRef(null);
+  const isFocused = useRef(false);
+
+  useEffect(() => {
+    const onMove = (e) => {
+      if (!composerWrapRef.current || !ringRef.current || isFocused.current) return;
+      const r = composerWrapRef.current.getBoundingClientRect();
+      const dx = Math.max(r.left - e.clientX, 0, e.clientX - r.right);
+      const dy = Math.max(r.top - e.clientY, 0, e.clientY - r.bottom);
+      const intent = Math.max(0, 1 - Math.hypot(dx, dy) / 180) ** 2;
+      ringRef.current.style.opacity = intent.toFixed(3);
+    };
+    document.addEventListener('pointermove', onMove, { passive: true });
+    return () => document.removeEventListener('pointermove', onMove);
+  }, []);
 
   const submit = () => { if (!draft.trim()) return; addTask(draft, tagId, dateForLane(lane)); setDraft(''); };
 
@@ -56,9 +73,13 @@ export default function Focal({
       </div>
 
       {/* composer */}
-      <div className="flex gap-1.5 items-center bg-surface-2 rounded-full pl-4 pr-[5px] py-[5px] mb-5">
+      <div ref={composerWrapRef} className="relative flex gap-1.5 items-center bg-surface-2 rounded-full pl-4 pr-[5px] py-[5px] mb-5">
+        <div ref={ringRef} className="pointer-events-none absolute rounded-full border border-text-3"
+          style={{ opacity: 0, inset: '-2px', transition: 'opacity 0.15s ease' }} />
         <input ref={composerRef} value={draft} onChange={(e) => setDraft(e.target.value)}
           onKeyDown={(e) => e.key === 'Enter' && submit()} placeholder="Add a task…"
+          onFocus={() => { isFocused.current = true; if (ringRef.current) ringRef.current.style.opacity = '1'; }}
+          onBlur={() => { isFocused.current = false; if (ringRef.current) ringRef.current.style.opacity = '0'; }}
           className="flex-1 min-w-0 bg-transparent outline-none text-sm py-[9px] placeholder:text-text-3" />
         <select value={lane} onChange={(e) => setLane(e.target.value)}
           className="bg-transparent text-xs text-text-2 outline-none cursor-pointer">
@@ -137,8 +158,9 @@ export default function Focal({
 
                     {t.status && (
                       <span className={`text-[10px] tracking-wide uppercase px-2 py-0.5 rounded-full whitespace-nowrap
-                        ${t.status === 'started' ? 'text-accent-text bg-accent-tint' : ''}
-                        ${t.status === 'hold' ? 'text-[#9a6b1e] bg-[#f6e8cf]' : ''}
+                        ${t.status === 'pending'   ? 'text-[#2563eb] bg-[#dbeafe]' : ''}
+                        ${t.status === 'started'   ? 'text-[#166534] bg-[#dcfce7]' : ''}
+                        ${t.status === 'hold'      ? 'text-[#9a6b1e] bg-[#f6e8cf]' : ''}
                         ${t.status === 'postponed' ? 'text-text-2 bg-surface-3' : ''}`}>
                         {STATUSES.find((s) => s.id === t.status)?.label}
                       </span>

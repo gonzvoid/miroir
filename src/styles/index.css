@@ -22,21 +22,34 @@
   --tick-empty:#3A3D37; --dark-cap:#0C0D0B; --dark-cap-text:#ECEDE9; --dark-cap-2:#8A8C85;
   --shadow-lg:0 24px 50px -30px rgba(0,0,0,.6); --shadow-sm:0 8px 20px -14px rgba(0,0,0,.5);
 }
+[data-theme="cream"] {
+  --canvas:#FDF8F3; --surface:#FEFCF8; --surface-2:#F5EFE4; --surface-3:#ECE5D7; --stroke:#DDD5C4;
+  --text:#1C1510; --text-2:#7D7166; --text-3:#ABA094;
+  --accent:#334155; --accent-tint:#EDF0F4; --accent-text:#1E293B;
+  --tick-empty:#CFC8B8; --dark-cap:#1C1510; --dark-cap-text:#EDE5D7; --dark-cap-2:#9A8E82;
+  --shadow-lg:0 18px 40px -24px rgba(28,21,16,.16),0 4px 12px -8px rgba(28,21,16,.06);
+  --shadow-sm:0 6px 18px -12px rgba(28,21,16,.10);
+}
 
 /* ── Accent presets ──────────────────────────────────────────── */
-[data-theme="light"][data-accent="forest"] { --accent:#3D5A40; --accent-tint:#E8EEE7; --accent-text:#2F4632; }
+[data-theme="light"][data-accent="forest"],
+[data-theme="cream"][data-accent="forest"] { --accent:#3D5A40; --accent-tint:#E8EEE7; --accent-text:#2F4632; }
 [data-theme="dark"] [data-accent="forest"] { --accent:#9DB89F; --accent-tint:#232A23; --accent-text:#B6CBB7; }
 
-[data-theme="light"][data-accent="navy"]   { --accent:#1D4ED8; --accent-tint:#EFF6FF; --accent-text:#1E3A8A; }
+[data-theme="light"][data-accent="navy"],
+[data-theme="cream"][data-accent="navy"]   { --accent:#1D4ED8; --accent-tint:#EFF6FF; --accent-text:#1E3A8A; }
 [data-theme="dark"] [data-accent="navy"]   { --accent:#60A5FA; --accent-tint:#1E3A8A; --accent-text:#BFDBFE; }
 
-[data-theme="light"][data-accent="violet"] { --accent:#7C3AED; --accent-tint:#F5F3FF; --accent-text:#4C1D95; }
+[data-theme="light"][data-accent="violet"],
+[data-theme="cream"][data-accent="violet"] { --accent:#7C3AED; --accent-tint:#F5F3FF; --accent-text:#4C1D95; }
 [data-theme="dark"] [data-accent="violet"] { --accent:#A78BFA; --accent-tint:#2E1065; --accent-text:#DDD6FE; }
 
-[data-theme="light"][data-accent="rose"]   { --accent:#E11D48; --accent-tint:#FFF1F2; --accent-text:#9F1239; }
+[data-theme="light"][data-accent="rose"],
+[data-theme="cream"][data-accent="rose"]   { --accent:#E11D48; --accent-tint:#FFF1F2; --accent-text:#9F1239; }
 [data-theme="dark"] [data-accent="rose"]   { --accent:#F472B6; --accent-tint:#500724; --accent-text:#FBCFE8; }
 
-[data-theme="light"][data-accent="amber"]  { --accent:#D97706; --accent-tint:#FFFBEB; --accent-text:#92400E; }
+[data-theme="light"][data-accent="amber"],
+[data-theme="cream"][data-accent="amber"]  { --accent:#D97706; --accent-tint:#FFFBEB; --accent-text:#92400E; }
 [data-theme="dark"] [data-accent="amber"]  { --accent:#FCD34D; --accent-tint:#451A03; --accent-text:#78350F; }
 
 * { box-sizing: border-box; }
@@ -62,3 +75,20 @@ input, textarea, select { transition: border-color 0.15s ease; }
 /* draggable titlebar area for the frameless mac window */
 .titlebar-drag { -webkit-app-region: drag; }
 .titlebar-drag button, .titlebar-drag select, .titlebar-drag input { -webkit-app-region: no-drag; }
+
+/* tab content fade-in (Social Planner, etc.) */
+@keyframes tab-fade-in {
+  from { opacity: 0; transform: translateY(5px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+.tab-content { animation: tab-fade-in 0.16s ease-out; }
+
+/* digit-slot animation for FocusTile */
+@keyframes focus-digit-out {
+  0%   { transform: translateY(0);    filter: blur(0);    opacity: 1; }
+  100% { transform: translateY(-55%); filter: blur(12px); opacity: 0; }
+}
+@keyframes focus-digit-in {
+  0%   { transform: translateY(60%);  filter: blur(10px); opacity: 0; }
+  100% { transform: translateY(0);    filter: blur(0);    opacity: 1; }
+}

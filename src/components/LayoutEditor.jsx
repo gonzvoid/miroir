@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { TILE_CATALOG } from '../lib/utils';
-import { X, Plus } from './icons';
+import { X } from './icons';
 
 /* ── Deterministic dot-opacity pattern for activity grids ─────── */
 const DOT_OPS = [0.08, 0.18, 0.35, 0.60, 0.90, 0.45, 0.22, 0.72, 0.10, 0.50,
@@ -68,10 +68,14 @@ function TilePreview({ id, label }) {
       </div>
     ),
 
-    visual: (
-      <div className="flex flex-col gap-1.5 h-full">
-        <div className="flex-1 rounded-xl bg-surface-2 border border-stroke" style={{ minHeight: 44 }} />
-        <div className="h-6 rounded-lg bg-surface-2 border border-stroke" />
+    image: (
+      <div className="flex-1 rounded-xl bg-surface-2 border border-stroke" style={{ minHeight: 52 }} />
+    ),
+
+    countdown: (
+      <div className="flex flex-col items-center justify-center gap-1 h-full">
+        <div className="h-7 w-10 rounded-lg bg-surface-2 border border-stroke" />
+        <div className="h-2 w-12 rounded-full bg-surface-3" />
       </div>
     ),
 
@@ -222,100 +226,53 @@ function DropZone({ active }) {
 }
 
 /* ── Unplaced tile in the shelf ──────────────────────────────── */
-function UnplacedTile({ tile, onAdd, onDragStart, onDragEnd, isDragging }) {
-  const [picking, setPicking] = useState(false);
+function UnplacedTile({ tile, onDragStart, onDragEnd, isDragging }) {
   const h = Math.min(TILE_H[tile?.id] ?? 120, 116);
 
   return (
-    <div className="relative" style={{ opacity: isDragging ? 0.35 : 1 }}>
-      <div
-        draggable
-        onDragStart={onDragStart}
-        onDragEnd={onDragEnd}
-        onClick={() => setPicking((v) => !v)}
-        className="group relative bg-surface border border-stroke rounded-card p-4 shadow-sm
-          w-full text-left overflow-hidden transition-shadow hover:shadow cursor-grab"
-        style={{ height: h }}>
-        <TilePreview id={tile?.id ?? ''} label={tile?.label ?? ''} />
-        <div className="absolute inset-0 rounded-card opacity-0 group-hover:opacity-100 transition-opacity
-          flex items-center justify-center pointer-events-none">
-          <div className="w-8 h-8 rounded-full bg-text flex items-center justify-center shadow-sm">
-            <Plus size={13} className="text-canvas" />
-          </div>
+    <div
+      draggable
+      onDragStart={onDragStart}
+      onDragEnd={onDragEnd}
+      className="group relative bg-surface border border-stroke rounded-card p-4 shadow-sm
+        w-full text-left overflow-hidden transition-shadow hover:shadow cursor-grab"
+      style={{ height: h, opacity: isDragging ? 0.35 : 1 }}>
+      <TilePreview id={tile?.id ?? ''} label={tile?.label ?? ''} />
+      <div className="absolute inset-0 rounded-card opacity-0 group-hover:opacity-100 transition-opacity
+        flex items-center justify-center pointer-events-none">
+        <div className="text-[11px] text-text-2 bg-surface/80 px-2.5 py-1 rounded-full backdrop-blur-sm border border-stroke">
+          Drag to a column
         </div>
       </div>
-
-      {picking && (
-        <div className="absolute top-full left-0 mt-1.5 bg-surface border border-stroke rounded-xl shadow-lg p-1.5 z-10 min-w-[140px]"
-          onMouseLeave={() => setPicking(false)}>
-          {[['left', 'Left'], ['mid', 'Center'], ['right', 'Right']].map(([col, lbl]) => (
-            <button key={col} onClick={() => { onAdd(col); setPicking(false); }}
-              className="flex w-full items-center px-2.5 py-2 rounded-lg hover:bg-surface-2
-                text-text-2 hover:text-text text-[12.5px] transition-colors">
-              Add to {lbl}
-            </button>
-          ))}
-        </div>
-      )}
-    </div>
-  );
-}
-
-/* ── Small "+ Add tile" button ───────────────────────────────── */
-function AddButton({ available, onAdd }) {
-  const [open, setOpen] = useState(false);
-  if (!available.length) return null;
-  return (
-    <div className="relative">
-      <button onClick={() => setOpen((v) => !v)}
-        className="flex items-center gap-1.5 w-full px-3 py-2 rounded-xl
-          text-text-3 hover:text-text-2 text-[12px] transition-colors hover:bg-surface-2">
-        <Plus size={11} /> Add tile
-      </button>
-      {open && (
-        <div className="absolute bottom-full left-0 mb-1 bg-surface border border-stroke rounded-xl shadow-lg p-1.5 z-10 min-w-[176px]"
-          onMouseLeave={() => setOpen(false)}>
-          {available.map((t) => (
-            <button key={t.id} onClick={() => { onAdd(t.id); setOpen(false); }}
-              className="flex items-center gap-2 w-full px-2.5 py-2 rounded-lg
-                hover:bg-surface-2 text-text-2 hover:text-text text-[12.5px] text-left transition-colors">
-              {t.label}
-            </button>
-          ))}
-        </div>
-      )}
     </div>
   );
 }
 
 /* ── Main component ───────────────────────────────────────────── */
-const COL_LABELS = { left: 'Left', mid: 'Center', right: 'Right' };
+const COLS = ['left', 'mid', 'right', 'far'];
+const COL_LABELS = { left: 'Left', mid: 'Center', right: 'Right', far: 'Far right' };
 
 export default function LayoutEditor({ layout, onLayoutChange, onClose }) {
   const [draft, setDraft] = useState({
     left:  [...(layout?.left  ?? [])],
     mid:   [...(layout?.mid   ?? [])],
     right: [...(layout?.right ?? [])],
+    far:   [...(layout?.far   ?? [])],
   });
 
-  // dragging: { id, fromCol } — fromCol is null when coming from shelf
-  const [dragging, setDragging]   = useState(null);
-  // dragOver: { col, idx } — insertion point (idx = position in column array)
-  const [dragOver, setDragOver]   = useState(null);
+  const [dragging, setDragging] = useState(null);
+  const [dragOver, setDragOver] = useState(null);
 
-  const placed    = new Set([...draft.left, ...draft.mid, ...draft.right]);
+  const placed    = new Set([...draft.left, ...draft.mid, ...draft.right, ...draft.far]);
   const available = TILE_CATALOG.filter((t) => !placed.has(t.id));
 
   /* ── mutation helpers ─────────────────────────────────────── */
   const remove = (id) =>
-    setDraft((d) => ({
-      left:  d.left.filter((t)  => t !== id),
-      mid:   d.mid.filter((t)   => t !== id),
-      right: d.right.filter((t) => t !== id),
-    }));
-
-  const add = (id, col) =>
-    setDraft((d) => ({ ...d, [col]: [...d[col], id] }));
+    setDraft((d) => {
+      const next = {};
+      for (const col of COLS) next[col] = d[col].filter((t) => t !== id);
+      return next;
+    });
 
   const moveUp = (col, idx) => {
     if (idx === 0) return;
@@ -339,12 +296,11 @@ export default function LayoutEditor({ layout, onLayoutChange, onClose }) {
     const { id, fromCol } = dragging;
 
     setDraft((d) => {
-      const next = { left: [...d.left], mid: [...d.mid], right: [...d.right] };
+      const next = {};
+      for (const col of COLS) next[col] = [...d[col]];
 
-      // Remove from source column (if placed)
       if (fromCol) next[fromCol] = next[fromCol].filter((t) => t !== id);
 
-      // Adjust index if dropping in same column below the removed item
       let idx = toIdx;
       if (fromCol === toCol) {
         const wasAt = d[fromCol].indexOf(id);
@@ -360,7 +316,6 @@ export default function LayoutEditor({ layout, onLayoutChange, onClose }) {
     setDragOver(null);
   };
 
-  // Shared column drop-zone props
   const colDropProps = (col, idx) => ({
     onDragOver: (e) => { e.preventDefault(); setDragOver({ col, idx }); },
     onDrop:     (e) => { e.preventDefault(); e.stopPropagation(); handleDrop(col, idx); },
@@ -393,14 +348,17 @@ export default function LayoutEditor({ layout, onLayoutChange, onClose }) {
 
       {/* ── scrollable body ──────────────────────────────────── */}
       <div className="flex-1 overflow-y-auto px-8 py-8">
-        <div className="grid grid-cols-3 gap-5 max-w-4xl mx-auto">
-          {(['left', 'mid', 'right']).map((col) => (
+        <div className="grid grid-cols-4 gap-5 max-w-5xl mx-auto">
+          {COLS.map((col) => (
             <div key={col}>
               <div className="flex items-center gap-2 mb-3">
                 <span className="text-text-2 text-[11px] uppercase tracking-widest font-medium">
                   {COL_LABELS[col]}
                 </span>
                 <span className="text-text-3 text-[11px]">{draft[col].length}</span>
+                {col === 'far' && (
+                  <span className="text-text-3 text-[10px] ml-auto normal-case tracking-normal">2xl only</span>
+                )}
               </div>
 
               {/* column drop container */}
@@ -409,7 +367,6 @@ export default function LayoutEditor({ layout, onLayoutChange, onClose }) {
                 onDragOver={(e) => { e.preventDefault(); if (!dragOver || dragOver.col !== col) setDragOver({ col, idx: draft[col].length }); }}
                 onDrop={(e) => { e.preventDefault(); handleDrop(col, draft[col].length); }}>
 
-                {/* drop zone before first tile */}
                 <div {...colDropProps(col, 0)}>
                   <DropZone active={!!dragging && dragOver?.col === col && dragOver?.idx === 0} />
                 </div>
@@ -417,7 +374,7 @@ export default function LayoutEditor({ layout, onLayoutChange, onClose }) {
                 {draft[col].length === 0 && !dragging && (
                   <div className="flex items-center justify-center text-text-3 text-[12px] py-8
                     bg-surface-2 border border-dashed border-stroke rounded-2xl mx-0">
-                    Empty
+                    Empty — drag here
                   </div>
                 )}
 
@@ -436,15 +393,12 @@ export default function LayoutEditor({ layout, onLayoutChange, onClose }) {
                         onDragStart={() => setDragging({ id, fromCol: col })}
                         onDragEnd={() => { setDragging(null); setDragOver(null); }}
                       />
-                      {/* drop zone after each tile */}
                       <div {...colDropProps(col, idx + 1)}>
                         <DropZone active={!!dragging && dragOver?.col === col && dragOver?.idx === idx + 1} />
                       </div>
                     </div>
                   );
                 })}
-
-                <AddButton available={available} onAdd={(id) => add(id, col)} />
               </div>
             </div>
           ))}
@@ -452,9 +406,9 @@ export default function LayoutEditor({ layout, onLayoutChange, onClose }) {
 
         {/* ── unplaced shelf ───────────────────────────────────────── */}
         {available.length > 0 && (
-          <div className="mt-10 max-w-4xl mx-auto">
+          <div className="mt-10 max-w-5xl mx-auto">
             <div className="text-text-3 text-[11px] uppercase tracking-widest mb-4">
-              Not placed
+              Not placed — drag into a column
             </div>
             <div className="grid grid-cols-4 gap-3">
               {available.map((tile) => (
@@ -462,7 +416,6 @@ export default function LayoutEditor({ layout, onLayoutChange, onClose }) {
                   key={tile.id}
                   tile={tile}
                   isDragging={dragging?.id === tile.id}
-                  onAdd={(col) => add(tile.id, col)}
                   onDragStart={() => setDragging({ id: tile.id, fromCol: null })}
                   onDragEnd={() => { setDragging(null); setDragOver(null); }}
                 />

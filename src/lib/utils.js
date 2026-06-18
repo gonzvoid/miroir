@@ -22,8 +22,9 @@ export const LANES = [
   { id:'future', label:'Future' },
 ];
 export const STATUSES = [
-  { id:'started', label:'Started' },
-  { id:'hold', label:'On hold' },
+  { id:'pending',   label:'Pending' },
+  { id:'started',   label:'Started' },
+  { id:'hold',      label:'On hold' },
   { id:'postponed', label:'Postponed' },
 ];
 
@@ -102,13 +103,13 @@ export const COUNTDOWNS = [
 // All tiles available in the system
 export const TILE_CATALOG = [
   { id:'focal',      label:'Things to do' },
-  { id:'capture',    label:'Quick capture' },
   { id:'tasklog',    label:'Task history' },
   { id:'summary',    label:'Summary' },
   { id:'loops',      label:'Daily loops' },
   { id:'doodle',     label:'Daily doodle' },
   { id:'lunchMenu',  label:'Weekly menu' },
-  { id:'visual',     label:'Image & Countdown' },
+  { id:'image',      label:'Photo slide' },
+  { id:'countdown',  label:'Countdown' },
   { id:'timeline',   label:'Today' },
   { id:'sources',    label:'Calendars' },
   { id:'calendar',   label:'Calendar' },
@@ -118,6 +119,10 @@ export const TILE_CATALOG = [
   { id:'books',      label:'Book tracker' },
   { id:'trip',       label:'Next trip' },
   { id:'canvas',     label:'Live canvas' },
+  { id:'worldclock', label:'World clock' },
+  { id:'inspolinks', label:'Inspiration links' },
+  { id:'plants',     label:'Plant tracker' },
+  { id:'social',     label:'Social planner' },
 ];
 
 // Accent colour presets — id maps to data-accent attribute
@@ -134,23 +139,27 @@ export const ACCENT_PRESETS = [
 export const LAYOUT_PRESETS = {
   design: {
     left: ['focal', 'tasklog'],
-    mid:  ['doodle', 'visual'],
+    mid:  ['doodle', 'image', 'countdown'],
     right: ['mood', 'calendar'],
+    far:  [],
   },
   dev: {
-    left: ['focal', 'capture', 'summary'],
+    left: ['focal', 'summary'],
     mid:  ['loops', 'timeline'],
     right: ['mood', 'calendar'],
+    far:  [],
   },
   gtd: {
-    left: ['focal', 'capture'],
+    left: ['focal'],
     mid:  ['loops', 'timeline', 'summary'],
     right: ['mood', 'calendar'],
+    far:  [],
   },
   personal: {
     left: ['focal', 'tasklog'],
-    mid:  ['loops', 'visual'],
+    mid:  ['loops', 'image', 'countdown'],
     right: ['mood', 'calendar'],
+    far:  [],
   },
 };
 
