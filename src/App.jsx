@@ -563,38 +563,46 @@ export default function App() {
   }, [patch]);
 
   /* ---- render ---- */
-  if (!loaded) return <div className="grid place-items-center h-screen text-text-3">·</div>;
+  if (!loaded) return <div style={{ position: 'fixed', inset: 0, borderRadius: 12, overflow: 'hidden' }} className="grid place-items-center text-text-3">·</div>;
 
   if (s.name === null || s.name === undefined) {
     return (
-      <OnboardingScreen onDone={(name, theme, bg) => {
-        patch('name', name);
-        patch('theme', theme);
-        patch('clockFace', 'orb');
-        patch('layout', ONBOARDING_LAYOUT);
-        if (bg) patch('bg', bg);
-      }} />
+      <div style={{ position: 'fixed', inset: 0, borderRadius: 12, overflow: 'hidden', transform: 'translateZ(0)' }}>
+        <OnboardingScreen onDone={(name, theme, bg) => {
+          patch('name', name);
+          patch('theme', theme);
+          patch('clockFace', 'orb');
+          patch('layout', ONBOARDING_LAYOUT);
+          if (bg) patch('bg', bg);
+        }} />
+      </div>
     );
   }
 
   // Preview onboarding overlay (Ctrl+Shift+O) — does NOT touch the store
   if (previewOnboarding) {
     return (
-      <OnboardingScreen
-        theme={s.theme}
-        onClose={() => setPreviewOnboarding(false)}
-        onDone={() => setPreviewOnboarding(false)}
-      />
+      <div style={{ position: 'fixed', inset: 0, borderRadius: 12, overflow: 'hidden', transform: 'translateZ(0)' }}>
+        <OnboardingScreen
+          theme={s.theme}
+          onClose={() => setPreviewOnboarding(false)}
+          onDone={() => setPreviewOnboarding(false)}
+        />
+      </div>
     );
   }
 
   const tileLabels = TILE_CATALOG.reduce((acc, t) => { acc[t.id] = t.label; return acc; }, {});
 
   return (
-    <div className="min-h-screen">
-      <div className="fixed inset-0 bg-canvas" style={{ zIndex: -20 }} />
+    <div style={{
+      position: 'fixed', inset: 0,
+      borderRadius: 12, overflow: 'hidden',
+      transform: 'translateZ(0)',
+    }}>
+      <div className="absolute inset-0 bg-canvas" style={{ zIndex: -20 }} />
       {s.bg && (
-        <div className="fixed inset-0" style={{ zIndex: -10 }}>
+        <div className="absolute inset-0" style={{ zIndex: -10 }}>
           <div className="absolute inset-0 bg-cover bg-center" style={{ backgroundImage: `url(${s.bg})` }} />
           <div className="absolute inset-0 bg-canvas" style={{ opacity: 0.55 }} />
         </div>
@@ -614,66 +622,69 @@ export default function App() {
         <SettingsPanel s={s} patch={patch} onClose={() => setShowSettings(false)} />
       )}
 
-      {/* sticky top bar — icons + window controls always visible */}
-      <div className="sticky top-0 z-40 px-[26px] pt-2 pb-8" style={{ pointerEvents: 'none' }}>
-        {/* bar background — frosted glass when bg image is set, solid otherwise */}
-        <div className="absolute inset-x-0 top-0" style={{
-          height: 42,
-          background: s.bg
-            ? 'color-mix(in srgb, var(--canvas) 55%, transparent)'
-            : 'var(--canvas)',
-          backdropFilter:         s.bg ? 'blur(14px) saturate(140%)' : undefined,
-          WebkitBackdropFilter:   s.bg ? 'blur(14px) saturate(140%)' : undefined,
-        }} />
-        {/* gradient fade tail */}
-        <div className="absolute inset-x-0 bottom-0" style={{
-          top: 42,
-          background: 'linear-gradient(to bottom, color-mix(in srgb, var(--canvas) 80%, transparent) 0%, color-mix(in srgb, var(--canvas) 40%, transparent) 45%, color-mix(in srgb, var(--canvas) 8%, transparent) 75%, transparent 100%)',
-        }} />
-        <div className="relative" style={{ pointerEvents: 'auto' }}>
-          <TopBar
+      {/* inner scroll container — sticky bar + tiles scroll together */}
+      <div style={{ height: '100%', overflowY: 'auto' }}>
+        {/* sticky top bar — icons + window controls always visible */}
+        <div className="sticky top-0 z-40 px-[26px] pt-2 pb-8" style={{ pointerEvents: 'none' }}>
+          {/* bar background — frosted glass when bg image is set, solid otherwise */}
+          <div className="absolute inset-x-0 top-0" style={{
+            height: 42,
+            background: s.bg
+              ? 'color-mix(in srgb, var(--canvas) 55%, transparent)'
+              : 'var(--canvas)',
+            backdropFilter:         s.bg ? 'blur(14px) saturate(140%)' : undefined,
+            WebkitBackdropFilter:   s.bg ? 'blur(14px) saturate(140%)' : undefined,
+          }} />
+          {/* gradient fade tail */}
+          <div className="absolute inset-x-0 bottom-0" style={{
+            top: 42,
+            background: 'linear-gradient(to bottom, color-mix(in srgb, var(--canvas) 80%, transparent) 0%, color-mix(in srgb, var(--canvas) 40%, transparent) 45%, color-mix(in srgb, var(--canvas) 8%, transparent) 75%, transparent 100%)',
+          }} />
+          <div className="relative" style={{ pointerEvents: 'auto' }}>
+            <TopBar
+              theme={s.theme} setTheme={(v) => patch('theme', v)}
+              unlocked={unlocked} setUnlocked={setUnlocked}
+              onOpenLayoutEditor={() => setShowLayoutEditor(true)}
+              onOpenSettings={() => setShowSettings(true)}
+            />
+          </div>
+        </div>
+
+        {/* scrollable content */}
+        <div className="px-[26px] pb-7">
+          <Header
             theme={s.theme} setTheme={(v) => patch('theme', v)}
-            unlocked={unlocked} setUnlocked={setUnlocked}
+            filter={filter} setFilter={setFilter}
+            now={now} unlocked={unlocked} setUnlocked={setUnlocked}
+            name={s.name} tags={tags} setTags={(v) => patch('tags', v)}
             onOpenLayoutEditor={() => setShowLayoutEditor(true)}
             onOpenSettings={() => setShowSettings(true)}
           />
+          <DndContext sensors={sensors} collisionDetection={closestCorners}
+            onDragStart={handleDragStart} onDragOver={handleDragOver} onDragEnd={handleDragEnd}>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-[1.25fr_1fr_1.05fr] gap-4 items-start">
+              {['left', 'mid', 'right', 'far'].map((col) => (
+                <div key={col} className={[
+                  col === 'right' ? 'md:col-span-2 lg:col-span-1' : '',
+                  col === 'far'   ? 'hidden' : '',
+                ].filter(Boolean).join(' ') || undefined}>
+                  <DroppableColumn id={col} items={activeLayout[col] ?? []} unlocked={unlocked} isAnyDragging={!!activeId} tileMap={tileMap} onRemoveTile={removeTileFromLayout} availableTiles={availableTiles} onAddTile={addTileToColumn} />
+                </div>
+              ))}
+            </div>
+
+            <DragOverlay dropAnimation={{ duration: 150, easing: 'ease' }}>
+              {activeId && (
+                <div className="rounded-card bg-surface shadow-lg opacity-80 p-[22px] border border-stroke"
+                  style={{ transform: 'rotate(0.8deg) scale(1.015)' }}>
+                  <div className="text-[13px] font-medium text-text-2">{tileLabels[activeId] ?? activeId}</div>
+                  <div className="mt-2 h-8 bg-surface-2 rounded-xl" />
+                  <div className="mt-1.5 h-4 bg-surface-2 rounded-xl w-2/3" />
+                </div>
+              )}
+            </DragOverlay>
+          </DndContext>
         </div>
-      </div>
-
-      {/* scrollable content */}
-      <div className="px-[26px] pb-7">
-        <Header
-          theme={s.theme} setTheme={(v) => patch('theme', v)}
-          filter={filter} setFilter={setFilter}
-          now={now} unlocked={unlocked} setUnlocked={setUnlocked}
-          name={s.name} tags={tags} setTags={(v) => patch('tags', v)}
-          onOpenLayoutEditor={() => setShowLayoutEditor(true)}
-          onOpenSettings={() => setShowSettings(true)}
-        />
-        <DndContext sensors={sensors} collisionDetection={closestCorners}
-          onDragStart={handleDragStart} onDragOver={handleDragOver} onDragEnd={handleDragEnd}>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-[1.25fr_1fr_1.05fr] gap-4 items-start">
-            {['left', 'mid', 'right', 'far'].map((col) => (
-              <div key={col} className={[
-                col === 'right' ? 'md:col-span-2 lg:col-span-1' : '',
-                col === 'far'   ? 'hidden' : '',
-              ].filter(Boolean).join(' ') || undefined}>
-                <DroppableColumn id={col} items={activeLayout[col] ?? []} unlocked={unlocked} isAnyDragging={!!activeId} tileMap={tileMap} onRemoveTile={removeTileFromLayout} availableTiles={availableTiles} onAddTile={addTileToColumn} />
-              </div>
-            ))}
-          </div>
-
-          <DragOverlay dropAnimation={{ duration: 150, easing: 'ease' }}>
-            {activeId && (
-              <div className="rounded-card bg-surface shadow-lg opacity-80 p-[22px] border border-stroke"
-                style={{ transform: 'rotate(0.8deg) scale(1.015)' }}>
-                <div className="text-[13px] font-medium text-text-2">{tileLabels[activeId] ?? activeId}</div>
-                <div className="mt-2 h-8 bg-surface-2 rounded-xl" />
-                <div className="mt-1.5 h-4 bg-surface-2 rounded-xl w-2/3" />
-              </div>
-            )}
-          </DragOverlay>
-        </DndContext>
       </div>
     </div>
   );

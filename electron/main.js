@@ -44,7 +44,7 @@ function createWindow() {
     width: 1440,
     height: 960,
     minWidth: 980,
-    backgroundColor: '#f4f4f2',
+    transparent: true,
     frame: false,
     autoHideMenuBar: true,
     webPreferences: {
