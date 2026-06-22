@@ -1,6 +1,6 @@
 {
   "name": "miroir-dashboard",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "description": "Miroir — personal dashboard for tasks, calendar, mood & ideas",
   "author": "Gonz / Blanco Void",
   "main": "electron/main.js",
