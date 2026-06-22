@@ -1,6 +1,5 @@
-import { useRef, useState } from 'react';
-import { Sun, Moon, ImageIcon, X, Lock, LockOpen, Trash2, Plus, Settings } from './icons';
-import { ACCENT_PRESETS } from '../lib/utils';
+import { useState } from 'react';
+import { Sun, Moon, Leaf, X, Lock, LockOpen, Trash2, Plus, Settings } from './icons';
 
 function WinMinIcon() {
   return <svg width="11" height="2" viewBox="0 0 11 2"><line x1="0.5" y1="1" x2="10.5" y2="1" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round"/></svg>;
@@ -60,23 +59,62 @@ function ColorSwatch({ current, onChange }) {
   );
 }
 
+/* ── Sticky top bar — always visible ── */
+export function TopBar({ theme, setTheme, unlocked, setUnlocked, onOpenLayoutEditor, onOpenSettings }) {
+  return (
+    <div className="titlebar-drag flex items-center justify-between h-8">
+      <div className="flex items-center gap-0.5">
+        <button onClick={onOpenLayoutEditor} title="Edit layout"
+          className="w-8 h-8 grid place-items-center text-text-3 hover:text-text hover:bg-surface-2 rounded-lg transition-colors">
+          <GridIcon size={14} />
+        </button>
+        <button onClick={() => setUnlocked((v) => !v)} title={unlocked ? 'Lock layout' : 'Unlock layout'}
+          className={`w-8 h-8 grid place-items-center rounded-lg transition-colors ${unlocked ? 'text-accent' : 'text-text-3 hover:text-text hover:bg-surface-2'}`}>
+          {unlocked ? <LockOpen size={14} /> : <Lock size={14} />}
+        </button>
+        <button
+          onClick={() => setTheme(theme === 'light' ? 'dark' : theme === 'dark' ? 'cream' : 'light')}
+          title={`Switch to ${theme === 'light' ? 'dark' : theme === 'dark' ? 'cream' : 'light'} mode`}
+          className="w-8 h-8 grid place-items-center text-text-3 hover:text-text hover:bg-surface-2 rounded-lg transition-colors">
+          {theme === 'light' ? <Moon size={14} /> : theme === 'dark' ? <Leaf size={14} /> : <Sun size={14} />}
+        </button>
+        <button onClick={onOpenSettings} title="Settings"
+          className="w-8 h-8 grid place-items-center text-text-3 hover:text-text hover:bg-surface-2 rounded-lg transition-colors">
+          <Settings size={14} />
+        </button>
+      </div>
+
+      {typeof window !== 'undefined' && window.lumen?.winClose && (
+        <div className="flex items-center gap-0.5">
+          <button onClick={() => window.lumen.winMinimize()} title="Minimize"
+            className="w-8 h-8 grid place-items-center text-text-3 hover:text-text hover:bg-surface-2 rounded-lg transition-colors">
+            <WinMinIcon />
+          </button>
+          <button onClick={() => window.lumen.winMaximize()} title="Maximize"
+            className="w-8 h-8 grid place-items-center text-text-3 hover:text-text hover:bg-surface-2 rounded-lg transition-colors">
+            <WinMaxIcon />
+          </button>
+          <button onClick={() => window.lumen.winClose()} title="Close"
+            className="w-8 h-8 grid place-items-center text-text-3 hover:text-white hover:bg-[#c0564b] rounded-lg transition-colors">
+            <WinCloseIcon />
+          </button>
+        </div>
+      )}
+    </div>
+  );
+}
+
+/* ── Greeting + filter pills — scrolls with content ── */
 export default function Header({
-  theme, setTheme, bg, setBg, filter, setFilter, now, unlocked, setUnlocked,
-  name, tags, setTags, accentColor, setAccentColor, onOpenLayoutEditor, onOpenSettings,
+  theme, setTheme, filter, setFilter, now, unlocked, setUnlocked,
+  name, tags, setTags, onOpenLayoutEditor, onOpenSettings,
 }) {
-  const fileRef = useRef();
   const [showTagEditor, setShowTagEditor] = useState(false);
-  const [showAccent, setShowAccent] = useState(false);
   const [newTagDraft, setNewTagDraft] = useState({ label: '', color: TAG_PALETTE[0] });
   const [addingTag, setAddingTag] = useState(false);
 
   const greeting = now.getHours() < 12 ? 'Good morning' : now.getHours() < 19 ? 'Good afternoon' : 'Good evening';
   const displayName = name || 'there';
-
-  const onFile = (e) => {
-    const f = e.target.files?.[0]; if (!f) return;
-    const r = new FileReader(); r.onload = () => setBg(r.result); r.readAsDataURL(f);
-  };
 
   const updateTag = (id, changes) => setTags((ts) => ts.map((t) => (t.id === id ? { ...t, ...changes } : t)));
   const deleteTag = (id) => { setTags((ts) => ts.filter((t) => t.id !== id)); if (filter === id) setFilter('all'); };
@@ -88,25 +126,20 @@ export default function Header({
     setAddingTag(false);
   };
 
-  const currentAccent = ACCENT_PRESETS.find((a) => a.id === accentColor) ?? ACCENT_PRESETS[0];
-
   return (
     <div className="titlebar-drag mb-5">
-      <div className="flex items-center justify-between gap-4 pl-7 pr-1">
+        <div className="flex items-center justify-between gap-4">
 
-        {/* left: greeting */}
-        <div className="min-w-0">
-          <div className="text-[12px] text-text-2 mb-0.5">
-            {now.toLocaleDateString('en-US', { weekday: 'long', day: 'numeric', month: 'long' })}
+          {/* left: greeting */}
+          <div className="min-w-0">
+            <div className="text-[12px] text-text-2 mb-0.5">
+              {now.toLocaleDateString('en-US', { weekday: 'long', day: 'numeric', month: 'long' })}
+            </div>
+            <div className="text-[22px] font-semibold tracking-tight leading-none" style={{ textWrap: 'balance' }}>{greeting}, {displayName}</div>
           </div>
-          <div className="text-[22px] font-semibold tracking-tight leading-none">{greeting}, {displayName}</div>
-        </div>
-
-        {/* right controls */}
-        <div className="flex items-center gap-2 shrink-0">
 
           {/* filter pills + tag editor */}
-          <div className="relative flex items-center gap-1">
+          <div className="relative flex items-center gap-1 shrink-0">
             <div className="flex bg-surface-2 rounded-full p-[3px]">
               <button onClick={() => setFilter('all')}
                 className={`text-[13px] px-4 py-[7px] rounded-full transition-colors ${filter === 'all' ? 'bg-surface text-text font-medium shadow-sm' : 'text-text-2'}`}>
@@ -137,7 +170,7 @@ export default function Header({
                     <input value={t.label} onChange={(e) => updateTag(t.id, { label: e.target.value })}
                       className="flex-1 text-[13px] bg-transparent outline-none min-w-0" />
                     <button onClick={() => deleteTag(t.id)}
-                      className="opacity-0 group-hover:opacity-100 text-text-3 hover:text-[#c0564b] p-0.5 transition-all shrink-0">
+                      className="opacity-0 group-hover:opacity-100 text-text-3 hover:text-[#c0564b] p-0.5 transition-opacity shrink-0">
                       <Trash2 size={12} />
                     </button>
                   </div>
@@ -166,92 +199,7 @@ export default function Header({
               </div>
             )}
           </div>
-
-          {/* layout editor */}
-          <button onClick={onOpenLayoutEditor} title="Edit layout"
-            className="w-9 h-9 grid place-items-center bg-surface-2 text-text-2 hover:text-text rounded-full transition-colors">
-            <GridIcon size={15} />
-          </button>
-
-          {/* accent colour */}
-          <div className="relative">
-            <button onClick={() => setShowAccent((v) => !v)} title="Accent colour"
-              className="w-9 h-9 grid place-items-center bg-surface-2 rounded-full transition-colors hover:opacity-80">
-              <span className="w-4 h-4 rounded-full border-2 border-transparent"
-                style={{ background: currentAccent.dot, boxShadow: '0 0 0 1.5px var(--stroke)' }} />
-            </button>
-            {showAccent && (
-              <div className="absolute right-0 top-full mt-2 bg-surface border border-stroke rounded-2xl shadow-lg p-3 z-50 min-w-[140px]"
-                onMouseLeave={() => setShowAccent(false)}>
-                <div className="text-[11px] tracking-widest uppercase text-text-3 mb-2.5 px-1">Accent</div>
-                {ACCENT_PRESETS.map((a) => (
-                  <button key={a.id} onClick={() => { setAccentColor(a.id); setShowAccent(false); }}
-                    className={`flex items-center gap-2.5 w-full px-2.5 py-2 rounded-xl transition-colors
-                      ${accentColor === a.id || (!accentColor && a.id === 'slate') ? 'bg-surface-2' : 'hover:bg-surface-2'}`}>
-                    <span className="w-3.5 h-3.5 rounded-full shrink-0" style={{ background: a.dot }} />
-                    <span className="text-[13px]">{a.label}</span>
-                    {(accentColor === a.id || (!accentColor && a.id === 'slate')) && (
-                      <span className="ml-auto text-[11px] text-text-3">✓</span>
-                    )}
-                  </button>
-                ))}
-              </div>
-            )}
-          </div>
-
-          {/* background image */}
-          <button onClick={() => fileRef.current.click()} title="Background"
-            className="w-9 h-9 grid place-items-center bg-surface-2 text-text-2 hover:text-text rounded-full">
-            <ImageIcon size={16} />
-          </button>
-          {bg && (
-            <button onClick={() => setBg(null)} title="Remove background"
-              className="w-9 h-9 grid place-items-center bg-surface-2 text-text-2 hover:text-text rounded-full">
-              <X size={16} />
-            </button>
-          )}
-          <input ref={fileRef} type="file" accept="image/*" hidden onChange={onFile} />
-
-          {/* lock */}
-          <button onClick={() => setUnlocked((v) => !v)} title={unlocked ? 'Lock layout' : 'Unlock layout'}
-            className={`w-9 h-9 grid place-items-center rounded-full transition-colors ${unlocked ? 'bg-accent text-white' : 'bg-surface-2 text-text-2 hover:text-text'}`}>
-            {unlocked ? <LockOpen size={16} /> : <Lock size={16} />}
-          </button>
-
-          {/* theme */}
-          <button onClick={() => setTheme(theme === 'light' ? 'dark' : 'light')} title="Toggle theme"
-            className="w-9 h-9 grid place-items-center bg-surface-2 text-text-2 hover:text-text rounded-full">
-            {theme === 'light' ? <Moon size={16} /> : <Sun size={16} />}
-          </button>
-
-          {/* settings */}
-          <button onClick={onOpenSettings} title="Settings"
-            className="w-9 h-9 grid place-items-center bg-surface-2 text-text-2 hover:text-text rounded-full transition-colors">
-            <Settings size={16} />
-          </button>
-
-          {/* window controls — only in Electron */}
-          {typeof window !== 'undefined' && window.lumen?.winClose && (
-            <>
-              <div className="w-px h-4 bg-stroke mx-0.5" />
-              <div className="flex items-center gap-0.5">
-                <button onClick={() => window.lumen.winMinimize()} title="Minimize"
-                  className="w-9 h-9 grid place-items-center text-text-3 hover:text-text hover:bg-surface-2 rounded-lg transition-colors">
-                  <WinMinIcon />
-                </button>
-                <button onClick={() => window.lumen.winMaximize()} title="Maximize"
-                  className="w-9 h-9 grid place-items-center text-text-3 hover:text-text hover:bg-surface-2 rounded-lg transition-colors">
-                  <WinMaxIcon />
-                </button>
-                <button onClick={() => window.lumen.winClose()} title="Close"
-                  className="w-9 h-9 grid place-items-center text-text-3 hover:text-white hover:bg-[#c0564b] rounded-lg transition-colors">
-                  <WinCloseIcon />
-                </button>
-              </div>
-            </>
-          )}
         </div>
       </div>
-    </div>
   );
 }

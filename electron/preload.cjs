@@ -16,6 +16,7 @@ contextBridge.exposeInMainWorld('lumen', {
   pickStorageDir: () => ipcRenderer.invoke('data:pickStorageDir'),
   obsidianPickVault: () => ipcRenderer.invoke('obsidian:pickVault'),
   obsidianScan: (vaultPath) => ipcRenderer.invoke('obsidian:scan', vaultPath),
+  openExternal:   (url) => ipcRenderer.invoke('shell:openExternal', url),
   winMinimize:    () => ipcRenderer.invoke('win:minimize'),
   winMaximize:    () => ipcRenderer.invoke('win:maximize'),
   winClose:       () => ipcRenderer.invoke('win:close'),

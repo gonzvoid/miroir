@@ -16,39 +16,39 @@ import {
   DEFAULT_CALENDARS, DEFAULT_LOOPS, DEFAULT_TAGS, SEED_EVENT_IDS,
   LAYOUT_PRESETS, TAGS_PRESETS, TILE_CATALOG, parseYmd,
 } from './lib/utils';
-import { GripVertical } from './components/icons';
-import Header from './components/Header';
+import { GripVertical, X, Plus } from './components/icons';
+import Header, { TopBar } from './components/Header';
 import Focal from './components/Focal';
 import ImageTile from './components/ImageTile';
 import LayoutEditor from './components/LayoutEditor';
 import SettingsPanel from './components/SettingsPanel';
 import {
-  Timeline, QuickCapture, DailyLoops, Summary, Countdown, Sources,
+  Timeline, DailyLoops, Summary, Countdown, Sources,
   MoodPanel, CalCard, TaskHistory, Doodle, LunchMenu,
   FocusTile, ProjectsTile, BooksTile, TripTile, LiveCanvas,
+  WorldClockTile, InspoLinksTile, PlantTrackerTile, SocialPlannerTile,
+  SunArcTile, MoonPhaseTile, WeatherOrbTile,
 } from './components/Tiles';
 
 const DEFAULT_LAYOUT = {
-  left: ['focal', 'capture', 'summary'],
-  mid:  ['loops', 'visual', 'timeline', 'sources'],
+  left:  ['focal', 'summary'],
+  mid:   ['loops', 'image', 'countdown', 'timeline', 'sources'],
   right: ['mood', 'calendar'],
+  far:   [],
 };
 
 function migrateLayout(l) {
-  if (!l) return DEFAULT_LAYOUT;
+  if (!l || typeof l !== 'object' || Array.isArray(l)) return DEFAULT_LAYOUT;
   const fix = (arr) => {
     if (!arr) return [];
     const out = [];
-    for (let i = 0; i < arr.length; i++) {
-      if (arr[i] === 'image' || arr[i] === 'countdown') {
-        if (!out.includes('visual')) out.push('visual');
-      } else {
-        out.push(arr[i]);
-      }
+    for (const id of arr) {
+      if (id === 'visual') out.push('image', 'countdown');
+      else if (id !== 'capture') out.push(id);
     }
     return out;
   };
-  return { left: fix(l.left), mid: fix(l.mid), right: fix(l.right) };
+  return { left: fix(l.left), mid: fix(l.mid), right: fix(l.right), far: fix(l.far) };
 }
 
 const DEFAULTS = {
@@ -57,11 +57,20 @@ const DEFAULTS = {
   loops: DEFAULT_LOOPS, countdowns: [], layout: DEFAULT_LAYOUT,
   tags: DEFAULT_TAGS, name: null, workType: null,
   doodles: {}, lunchMenu: {},
+  imageAlbums: [],
+  plants: [],
+  clocks: [
+    { id: 'c1', city: 'Madrid',   tz: 'Europe/Madrid' },
+    { id: 'c2', city: 'New York', tz: 'America/New_York' },
+  ],
+  inspoLinks: [],
+  clockFace: 'list',
   accentColor: 'slate', language: 'en', weekStart: 'mon', _v: 0,
   projects: [],
   books: { current: null, completed: [] },
   trip: null,
   pomodoroLog: [],
+  socialPlanner: { enabledNetworks: ['instagram', 'x'], posts: [] },
 };
 
 /* ---- drag helpers ---- */
@@ -71,7 +80,7 @@ function findContainerInLayout(layout, id) {
 }
 
 /* ---- SortableTile ---- */
-function SortableTile({ id, unlocked, isAnyDragging, children }) {
+function SortableTile({ id, unlocked, isAnyDragging, onRemove, children }) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } =
     useSortable({ id, disabled: !unlocked });
   return (
@@ -84,77 +93,93 @@ function SortableTile({ id, unlocked, isAnyDragging, children }) {
       }}
       className="relative">
       {unlocked && (
-        <div {...attributes} {...listeners}
-          className="absolute top-2.5 right-2.5 z-20 w-6 h-6 grid place-items-center bg-surface-3 rounded-full cursor-grab active:cursor-grabbing text-text-3 hover:text-text shadow-sm transition-colors">
-          <GripVertical size={13} />
+        <div className="absolute top-0 right-0 z-[19] pointer-events-none"
+          style={{
+            width: 88, height: 60,
+            background: 'radial-gradient(ellipse at 90% 10%, var(--surface) 0%, transparent 70%)',
+            opacity: 0.88,
+          }} />
+      )}
+      {unlocked && (
+        <div className="absolute top-2.5 right-2.5 z-20 flex items-center gap-1">
+          <button
+            onClick={() => onRemove?.(id)}
+            className="w-8 h-8 grid place-items-center bg-surface-3 rounded-full text-text-3 hover:text-[#c0564b] hover:bg-red-50 shadow-sm transition-colors">
+            <X size={12} />
+          </button>
+          <div {...attributes} {...listeners}
+            className="w-8 h-8 grid place-items-center bg-surface-3 rounded-full cursor-grab active:cursor-grabbing text-text-3 hover:text-text shadow-sm transition-colors">
+            <GripVertical size={14} />
+          </div>
         </div>
       )}
-      {children}
+      <div style={unlocked ? { pointerEvents: 'none', userSelect: 'none' } : undefined}>
+        {children}
+      </div>
+    </div>
+  );
+}
+
+/* ---- GhostTile — add tile from edit mode ---- */
+function GhostTile({ available, onAdd }) {
+  const [open, setOpen] = useState(false);
+  if (!available.length) return null;
+  return (
+    <div className="relative">
+      <button onClick={() => setOpen((v) => !v)}
+        className="w-full rounded-card border-2 border-dashed flex items-center justify-center transition-colors hover:bg-surface-2"
+        style={{ minHeight: 60, opacity: 0.65, borderColor: 'var(--text-3)' }}>
+        <Plus size={13} className="text-text-3" />
+      </button>
+      {open && (
+        <div className="absolute top-full left-0 mt-1.5 bg-surface border border-stroke rounded-xl shadow-lg z-30 min-w-[170px] overflow-hidden"
+          onMouseLeave={() => setOpen(false)}>
+          <div className="p-1.5 max-h-[220px] overflow-y-auto">
+            {available.map((t) => (
+              <button key={t.id} onClick={() => { onAdd(t.id); setOpen(false); }}
+                className="flex w-full items-center px-2.5 py-2 rounded-lg hover:bg-surface-2 text-text-2 hover:text-text text-[12.5px] text-left transition-colors">
+                {t.label}
+              </button>
+            ))}
+          </div>
+          <div className="pointer-events-none absolute bottom-0 left-0 right-0 h-8 rounded-b-xl"
+            style={{ background: 'linear-gradient(to bottom, transparent, var(--surface))' }} />
+        </div>
+      )}
     </div>
   );
 }
 
 /* ---- DroppableColumn ---- */
-function DroppableColumn({ id, items, unlocked, isAnyDragging, tileMap, className }) {
+function DroppableColumn({ id, items, unlocked, isAnyDragging, tileMap, onRemoveTile, availableTiles, onAddTile, className }) {
   const { setNodeRef } = useDroppable({ id });
   return (
     <SortableContext items={items} strategy={verticalListSortingStrategy}>
       <div ref={setNodeRef} className={`flex flex-col gap-4 min-h-20 ${className ?? ''}`}>
         {items.map((tileId) => (
-          <SortableTile key={tileId} id={tileId} unlocked={unlocked} isAnyDragging={isAnyDragging}>
+          <SortableTile key={tileId} id={tileId} unlocked={unlocked} isAnyDragging={isAnyDragging} onRemove={onRemoveTile}>
             {tileMap[tileId]}
           </SortableTile>
         ))}
+        {unlocked && <GhostTile available={availableTiles} onAdd={(tileId) => onAddTile(tileId, id)} />}
       </div>
     </SortableContext>
   );
 }
 
 /* ---- Onboarding ---- */
-const WORK_TYPES = [
-  {
-    id: 'design', label: 'Design & Visual', desc: 'UI, branding, creative direction',
-    cols: [2, 2, 2], // tile counts per column for preview schematic
-  },
-  {
-    id: 'dev', label: 'Development', desc: 'Code, systems, engineering',
-    cols: [3, 2, 2],
-  },
-  {
-    id: 'gtd', label: 'GTD / Productivity', desc: 'Task management, goals, focus',
-    cols: [2, 3, 2],
-  },
-  {
-    id: 'personal', label: 'Personal', desc: 'Life, habits, family, wellness',
-    cols: [2, 2, 2],
-  },
-];
+const ONBOARDING_LAYOUT = {
+  left:  ['focal', 'canvas', 'tasklog'],
+  mid:   ['social', 'image', 'projects'],
+  right: ['worldclock', 'mood', 'calendar', 'focus', 'countdown', 'timeline'],
+  far:   [],
+};
 
-function LayoutSchematic({ cols, active }) {
-  const H = [20, 14, 11, 8, 6];
-  return (
-    <div className="flex gap-[5px] items-start shrink-0">
-      {cols.map((n, ci) => (
-        <div key={ci} className="flex flex-col gap-[3px]" style={{ width: 18 }}>
-          {Array.from({ length: n }, (_, i) => (
-            <div key={i} className="rounded-[2px] transition-colors"
-              style={{
-                height: H[i] ?? 5,
-                background: active ? 'var(--text)' : 'var(--stroke)',
-                opacity: active ? 0.55 : 1,
-              }} />
-          ))}
-        </div>
-      ))}
-    </div>
-  );
-}
-
-function OnboardingScreen({ onDone, onClose, theme }) {
-  const [step, setStep] = useState(0);
-  const [name, setName] = useState('');
-  const [workType, setWorkType] = useState(null);
-  const [transitioning, setTransitioning] = useState(false);
+function OnboardingScreen({ onDone, onClose }) {
+  const [name, setName]   = useState('');
+  const [theme, setTheme] = useState('light');
+  const [bg, setBg]       = useState(null);
+  const fileRef           = useRef(null);
 
   useEffect(() => {
     if (!onClose) return;
@@ -163,107 +188,95 @@ function OnboardingScreen({ onDone, onClose, theme }) {
     return () => window.removeEventListener('keydown', handler);
   }, [onClose]);
 
-  const next = () => {
+  const finish = () => {
     if (!name.trim()) return;
-    setTransitioning(true);
-    setTimeout(() => { setStep(1); setTransitioning(false); }, 200);
+    onDone(name.trim(), theme, bg);
   };
 
-  const finish = () => {
-    if (!workType) return;
-    onDone(name.trim(), workType);
+  const onBgFile = (e) => {
+    const f = e.target.files?.[0];
+    if (!f) return;
+    setBg(f.path || URL.createObjectURL(f));
   };
 
   return (
-    <div className="fixed inset-0 flex items-center justify-center"
-      style={{ background: theme === 'dark'
-        ? 'linear-gradient(160deg, #141614 0%, #1B1E1A 55%, #0F110E 100%)'
-        : 'linear-gradient(160deg, #F8F8F6 0%, #EEF0EB 55%, #E6E9E2 100%)' }}>
+    <div className="fixed inset-0 overflow-hidden">
+      {/* Background — place onboarding-bg.jpg in src/assets/ to use the painting */}
+      <div className="absolute inset-0" style={{
+        background: 'linear-gradient(160deg, #1a3a6b 0%, #2d5f9e 18%, #c8883a 46%, #d94e1e 65%, #8b1a10 82%, #1a0f0a 100%)',
+      }} />
+      <img
+        src={new URL('./assets/onboarding1.png', import.meta.url).href}
+        className="absolute inset-0 w-full h-full object-cover"
+        onError={(e) => { e.target.style.display = 'none'; }}
+        alt=""
+      />
+      {/* Film grain */}
+      <div className="absolute inset-0 pointer-events-none" style={{
+        opacity: 0.55,
+        backgroundImage: `url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='g'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.72' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23g)'/%3E%3C/svg%3E")`,
+        backgroundRepeat: 'repeat',
+        backgroundSize: '256px 256px',
+      }} />
+      {/* Readability overlay */}
+      <div className="absolute inset-0"
+        style={{ background: 'linear-gradient(to bottom, rgba(0,0,0,0.18) 0%, rgba(0,0,0,0.52) 100%)' }} />
 
-      <div className={`w-full max-w-[400px] px-8 transition-all duration-200
-        ${transitioning ? 'opacity-0 translate-y-1.5' : 'opacity-100 translate-y-0'}`}>
+      {/* Centered content */}
+      <div className="relative z-10 flex flex-col items-center justify-center h-full px-8 text-center">
 
-        {step === 0 ? (
-          /* ── Step 1: name ─────────────────────────────────────── */
-          <div className="flex flex-col gap-7">
-            <div>
-              <div className="text-[11px] tracking-[0.18em] uppercase text-text-3 mb-4 font-medium">
-                Miroir
-              </div>
-              <div className="text-[38px] font-semibold tracking-tight text-text leading-[1.08] mb-3">
-                Your personal<br />command center.
-              </div>
-              <div className="text-text-2 text-[15px] leading-relaxed">
-                Designed to keep you focused<br />on what matters.
-              </div>
-            </div>
+        <div className="text-[10px] tracking-[0.28em] uppercase text-white/50 mb-10 font-medium">
+          Miroir
+        </div>
 
-            <input autoFocus value={name}
-              onChange={(e) => setName(e.target.value)}
-              onKeyDown={(e) => e.key === 'Enter' && next()}
-              placeholder="What should we call you?"
-              className="w-full bg-surface border border-stroke rounded-2xl px-5 py-4
-                text-[15px] text-text outline-none transition-colors
-                placeholder:text-text-3 focus:border-text-3" />
+        <h1 className="text-[54px] font-semibold tracking-tight text-white leading-[1.04] mb-4">
+          Your personal<br />command center.
+        </h1>
+        <p className="text-white/60 text-[16px] mb-12 leading-relaxed">
+          Designed to keep you focused<br />on what matters.
+        </p>
 
-            <button onClick={next} disabled={!name.trim()}
-              className="w-full py-[14px] rounded-2xl text-[14px] font-semibold
-                bg-text text-canvas transition-opacity disabled:opacity-20 hover:opacity-75
-                active:scale-[0.99]">
-              Continue →
+        {/* Name */}
+        <input autoFocus value={name} onChange={(e) => setName(e.target.value)}
+          onKeyDown={(e) => e.key === 'Enter' && finish()}
+          placeholder="What should we call you?"
+          className="w-full max-w-[360px] mb-7
+            bg-white/10 backdrop-blur-sm border border-white/20
+            rounded-2xl px-5 py-4 text-[15px] text-white text-center outline-none
+            placeholder:text-white/35 focus:border-white/55 transition-colors" />
+
+        {/* Theme picker */}
+        <div className="flex gap-2 mb-5">
+          {[
+            { id: 'light', label: 'Light' },
+            { id: 'dark',  label: 'Dark'  },
+            { id: 'cream', label: 'Cream' },
+          ].map((t) => (
+            <button key={t.id} onClick={() => setTheme(t.id)}
+              className={`px-5 py-2 rounded-full text-[13px] font-medium transition-all border
+                ${theme === t.id
+                  ? 'bg-white text-neutral-900 border-white'
+                  : 'bg-white/10 text-white/65 border-white/20 hover:bg-white/20'}`}>
+              {t.label}
             </button>
+          ))}
+        </div>
 
-            <div className="flex gap-1.5 justify-center">
-              <span className="w-4 h-[3px] rounded-full bg-text" />
-              <span className="w-[3px] h-[3px] rounded-full bg-stroke" />
-            </div>
-          </div>
+        {/* Dashboard BG picker */}
+        <input ref={fileRef} type="file" accept="image/*" className="hidden" onChange={onBgFile} />
+        <button onClick={() => fileRef.current?.click()}
+          className="text-white/40 text-[13px] mb-11 hover:text-white/70 transition-colors">
+          {bg ? '✓ Background image selected' : '+ Set dashboard background'}
+        </button>
 
-        ) : (
-          /* ── Step 2: work type ────────────────────────────────── */
-          <div className="flex flex-col gap-6">
-            <div>
-              <div className="text-[11px] tracking-[0.18em] uppercase text-text-3 mb-4 font-medium">
-                Miroir
-              </div>
-              <div className="text-[28px] font-semibold tracking-tight text-text mb-1">
-                Hi, {name}.
-              </div>
-              <div className="text-text-2 text-[14px]">
-                How will you use Miroir?<br />We'll set up a layout that fits.
-              </div>
-            </div>
+        {/* CTA */}
+        <button onClick={finish} disabled={!name.trim()}
+          className="px-12 py-[14px] rounded-2xl text-[14px] font-semibold
+            bg-white text-neutral-900 disabled:opacity-25 hover:opacity-80 transition-opacity
+            active:scale-[0.99]">
+          Get started →
+        </button>
 
-            <div className="flex flex-col gap-2">
-              {WORK_TYPES.map((wt) => (
-                <button key={wt.id} onClick={() => setWorkType(wt.id)}
-                  className={`text-left px-4 py-3.5 rounded-2xl border transition-all
-                    flex items-center gap-4
-                    ${workType === wt.id
-                      ? 'border-text bg-surface shadow-sm'
-                      : 'border-stroke bg-surface hover:bg-surface-2 hover:border-text-3'}`}>
-                  <div className="flex-1 min-w-0">
-                    <div className="text-text font-medium text-[13.5px]">{wt.label}</div>
-                    <div className="text-text-3 text-[12px] mt-0.5">{wt.desc}</div>
-                  </div>
-                  <LayoutSchematic cols={wt.cols} active={workType === wt.id} />
-                </button>
-              ))}
-            </div>
-
-            <button onClick={finish} disabled={!workType}
-              className="w-full py-[14px] rounded-2xl text-[14px] font-semibold
-                bg-text text-canvas transition-opacity disabled:opacity-20 hover:opacity-75
-                active:scale-[0.99]">
-              Set up my space →
-            </button>
-
-            <div className="flex gap-1.5 justify-center">
-              <span className="w-[3px] h-[3px] rounded-full bg-stroke" />
-              <span className="w-4 h-[3px] rounded-full bg-text" />
-            </div>
-          </div>
-        )}
       </div>
     </div>
   );
@@ -291,6 +304,23 @@ export default function App() {
   useEffect(() => {
     const handler = (e) => {
       if (e.ctrlKey && e.shiftKey && e.key === 'O') setPreviewOnboarding(true);
+    };
+    window.addEventListener('keydown', handler);
+    return () => window.removeEventListener('keydown', handler);
+  }, []);
+
+  // R → toggle layout unlock mode; Esc → exit unlock mode
+  useEffect(() => {
+    const handler = (e) => {
+      const tag = document.activeElement?.tagName;
+      if ((e.key === 'r' || e.key === 'R') && !e.ctrlKey && !e.metaKey && !e.altKey) {
+        if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return;
+        setUnlocked((v) => !v);
+      }
+      if (e.key === 'Escape') {
+        if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return;
+        setUnlocked(false);
+      }
     };
     window.addEventListener('keydown', handler);
     return () => window.removeEventListener('keydown', handler);
@@ -401,6 +431,14 @@ export default function App() {
   const vTasks  = useMemo(() => filter === 'all' ? tasks : tasks.filter((t) => t.lane === filter), [tasks, filter]);
   const vEvents = useMemo(() => filter === 'all' ? allEvents : allEvents.filter((e) => e.calendarId === filter), [allEvents, filter]);
 
+  // Migrate legacy tileImages/imageFolder → multi-album format (plain const, no hook)
+  const imageAlbums = (s.imageAlbums && s.imageAlbums.length > 0)
+    ? s.imageAlbums
+    : (s.tileImages && s.tileImages.length > 0)
+      ? [{ id: 'album-default', name: 'Album 1', images: s.tileImages, folder: s.imageFolder ?? null }]
+      : [];
+  const setImageAlbums = (v) => patch('imageAlbums', typeof v === 'function' ? v(imageAlbums) : v);
+
   /* ---- new tile handlers ---- */
   const addProject    = (p)  => patch('projects', (ps) => [...ps, p]);
   const updateProject = (id, changes) => patch('projects', (ps) => ps.map((p) => p.id === id ? { ...p, ...changes } : p));
@@ -425,19 +463,13 @@ export default function App() {
     focal:    <Focal tasks={vTasks} addTask={addTask} cycleTask={cycleTask} delTask={delTask}
                 editTask={editTask} setTaskStatus={setTaskStatus} setTaskLane={setTaskLane}
                 moveTask={moveTask} reorderTask={reorderTask} composerRef={composerRef} tags={tags} />,
-    capture:  <QuickCapture ideas={s.ideas} addIdea={addIdea} delIdea={delIdea}
-                ideaToTask={ideaToTask} addEvent={addEvent} focusComposer={focusComposer} />,
     summary:  <Summary tasks={tasks} moods={moods} now={now} />,
     tasklog:  <TaskHistory tasks={tasks} now={now} />,
     loops:    <DailyLoops loops={s.loops} setLoops={(v) => patch('loops', v)} />,
     doodle:   <Doodle doodles={s.doodles} setDoodles={(v) => patch('doodles', v)} now={now} />,
     lunchMenu:<LunchMenu lunchMenu={s.lunchMenu} setLunchMenu={(v) => patch('lunchMenu', v)} now={now} />,
-    visual: (
-      <div className="grid grid-cols-2 gap-4">
-        <ImageTile images={s.tileImages} setImages={(v) => patch('tileImages', v)} folder={s.imageFolder} setFolder={(v) => patch('imageFolder', v)} />
-        <Countdown countdowns={s.countdowns} setCountdowns={(v) => patch('countdowns', v)} />
-      </div>
-    ),
+    image:    <ImageTile albums={imageAlbums} setAlbums={setImageAlbums} />,
+    countdown:<Countdown countdowns={s.countdowns} setCountdowns={(v) => patch('countdowns', v)} />,
     timeline: <Timeline events={vEvents} now={now} />,
     sources:  <Sources calendars={allCalendars} setCalendars={(v) => patch('calendars', v)}
                 googleAccounts={googleAccounts} onConnect={onConnect} onDisconnect={onDisconnect}
@@ -445,33 +477,73 @@ export default function App() {
                 syncErrors={googleSyncErrors} onRefresh={fetchGoogleEvents} />,
     calendar: <CalCard viewMonth={viewMonth} setViewMonth={setViewMonth} events={vEvents}
                 calendars={allCalendars} addEvent={addEvent} />,
-    mood:     <MoodPanel selDay={selDay} shiftDay={shiftDay} moods={moods} setMoodSeg={setMoodSeg} now={now} />,
+    mood:     <MoodPanel selDay={selDay} shiftDay={shiftDay} setSelDay={setSelDay} moods={moods} setMoodSeg={setMoodSeg} now={now} />,
     focus:    <FocusTile pomodoroLog={s.pomodoroLog} onLogSession={logPomodoroSession} />,
     projects: <ProjectsTile projects={s.projects} onAdd={addProject} onUpdate={updateProject} onDelete={deleteProject} />,
     books:    <BooksTile books={s.books} onSet={setCurrentBook} onUpdate={updateCurrentPage} onComplete={completeCurrentBook} onDeleteCompleted={deleteCompletedBook} />,
     trip:     <TripTile trip={s.trip} onSet={setTrip} onUpdate={updateTrip} onClear={clearTrip} />,
-    canvas:   <LiveCanvas />,
+    canvas:      <LiveCanvas />,
+    sun:         <SunArcTile />,
+    moon:        <MoonPhaseTile />,
+    weather:     <WeatherOrbTile />,
+    worldclock:  <WorldClockTile  clocks={s.clocks}     setClocks={(v)    => patch('clocks', v)}  clockFace={s.clockFace}  setClockFace={(v) => patch('clockFace', v)} />,
+    inspolinks:  <InspoLinksTile  links={s.inspoLinks}  setLinks={(v)     => patch('inspoLinks', v)} />,
+    plants:      <PlantTrackerTile plants={s.plants}    setPlants={(v)    => patch('plants', v)} />,
+    social:      <SocialPlannerTile planner={s.socialPlanner} setPlanner={(v) => patch('socialPlanner', v)} />,
   };
+
+  const addTileToColumn = useCallback((tileId, col) => {
+    patch('layout', {
+      left: layout.left, mid: layout.mid, right: layout.right, far: layout.far,
+      [col]: [...(layout[col] ?? []), tileId],
+    });
+  }, [layout, patch]);
+
+  const removeTileFromLayout = useCallback((tileId) => {
+    patch('layout', {
+      left:  layout.left.filter((id) => id !== tileId),
+      mid:   layout.mid.filter((id) => id !== tileId),
+      right: layout.right.filter((id) => id !== tileId),
+      far:   layout.far.filter((id) => id !== tileId),
+    });
+  }, [layout, patch]);
 
   /* ---- DnD ---- */
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 8 } }));
   const [draftLayout, setDraftLayout] = useState(null);
   const activeLayout = draftLayout ?? layout;
+  const placedIds      = new Set([...(activeLayout.left??[]), ...(activeLayout.mid??[]), ...(activeLayout.right??[]), ...(activeLayout.far??[])]);
+  const availableTiles = TILE_CATALOG.filter((t) => !placedIds.has(t.id));
+  const dragOverTimer = useRef(null);
+  const pendingDragOver = useRef(null);
 
-  const handleDragStart = ({ active }) => { setActiveId(active.id); setDraftLayout(layout); };
+  const handleDragStart = ({ active }) => {
+    clearTimeout(dragOverTimer.current);
+    setActiveId(active.id);
+    setDraftLayout(layout);
+  };
   const handleDragOver = useCallback(({ active, over }) => {
     if (!over) return;
-    setDraftLayout((l) => {
-      if (!l) return l;
-      const ac = findContainerInLayout(l, active.id);
-      const oc = findContainerInLayout(l, over.id) ?? (over.id in l ? over.id : null);
-      if (!ac || !oc || ac === oc) return l;
-      const aItems = l[ac], oItems = l[oc];
-      const overIdx = over.id in l ? oItems.length : oItems.indexOf(over.id);
-      return { ...l, [ac]: aItems.filter((id) => id !== active.id), [oc]: [...oItems.slice(0, overIdx), active.id, ...oItems.slice(overIdx)] };
-    });
+    pendingDragOver.current = { active, over };
+    clearTimeout(dragOverTimer.current);
+    dragOverTimer.current = setTimeout(() => {
+      const pending = pendingDragOver.current;
+      if (!pending) return;
+      const { active: a, over: o } = pending;
+      setDraftLayout((l) => {
+        if (!l) return l;
+        const ac = findContainerInLayout(l, a.id);
+        const oc = findContainerInLayout(l, o.id) ?? (o.id in l ? o.id : null);
+        if (!ac || !oc || ac === oc) return l;
+        const aItems = l[ac], oItems = l[oc];
+        const overIdx = o.id in l ? oItems.length : oItems.indexOf(o.id);
+        return { ...l, [ac]: aItems.filter((id) => id !== a.id), [oc]: [...oItems.slice(0, overIdx), a.id, ...oItems.slice(overIdx)] };
+      });
+    }, 90);
   }, []);
   const handleDragEnd = useCallback(({ active, over }) => {
+    clearTimeout(dragOverTimer.current);
+    pendingDragOver.current = null;
     setActiveId(null);
     setDraftLayout((draft) => {
       if (!draft) return null;
@@ -495,11 +567,12 @@ export default function App() {
 
   if (s.name === null || s.name === undefined) {
     return (
-      <OnboardingScreen theme={s.theme} onDone={(name, workType) => {
+      <OnboardingScreen onDone={(name, theme, bg) => {
         patch('name', name);
-        patch('workType', workType);
-        patch('layout', LAYOUT_PRESETS[workType] ?? DEFAULT_LAYOUT);
-        patch('tags', TAGS_PRESETS[workType] ?? DEFAULT_TAGS);
+        patch('theme', theme);
+        patch('clockFace', 'orb');
+        patch('layout', ONBOARDING_LAYOUT);
+        if (bg) patch('bg', bg);
       }} />
     );
   }
@@ -541,23 +614,52 @@ export default function App() {
         <SettingsPanel s={s} patch={patch} onClose={() => setShowSettings(false)} />
       )}
 
-      <div className="max-w-[1240px] mx-auto px-[26px] pt-[26px] pb-7">
+      {/* sticky top bar — icons + window controls always visible */}
+      <div className="sticky top-0 z-40 px-[26px] pt-2 pb-8" style={{ pointerEvents: 'none' }}>
+        {/* bar background — frosted glass when bg image is set, solid otherwise */}
+        <div className="absolute inset-x-0 top-0" style={{
+          height: 42,
+          background: s.bg
+            ? 'color-mix(in srgb, var(--canvas) 55%, transparent)'
+            : 'var(--canvas)',
+          backdropFilter:         s.bg ? 'blur(14px) saturate(140%)' : undefined,
+          WebkitBackdropFilter:   s.bg ? 'blur(14px) saturate(140%)' : undefined,
+        }} />
+        {/* gradient fade tail */}
+        <div className="absolute inset-x-0 bottom-0" style={{
+          top: 42,
+          background: 'linear-gradient(to bottom, color-mix(in srgb, var(--canvas) 80%, transparent) 0%, color-mix(in srgb, var(--canvas) 40%, transparent) 45%, color-mix(in srgb, var(--canvas) 8%, transparent) 75%, transparent 100%)',
+        }} />
+        <div className="relative" style={{ pointerEvents: 'auto' }}>
+          <TopBar
+            theme={s.theme} setTheme={(v) => patch('theme', v)}
+            unlocked={unlocked} setUnlocked={setUnlocked}
+            onOpenLayoutEditor={() => setShowLayoutEditor(true)}
+            onOpenSettings={() => setShowSettings(true)}
+          />
+        </div>
+      </div>
+
+      {/* scrollable content */}
+      <div className="px-[26px] pb-7">
         <Header
           theme={s.theme} setTheme={(v) => patch('theme', v)}
-          bg={s.bg} setBg={(v) => patch('bg', v)}
           filter={filter} setFilter={setFilter}
           now={now} unlocked={unlocked} setUnlocked={setUnlocked}
           name={s.name} tags={tags} setTags={(v) => patch('tags', v)}
-          accentColor={s.accentColor} setAccentColor={(v) => patch('accentColor', v)}
           onOpenLayoutEditor={() => setShowLayoutEditor(true)}
           onOpenSettings={() => setShowSettings(true)}
         />
-
         <DndContext sensors={sensors} collisionDetection={closestCorners}
           onDragStart={handleDragStart} onDragOver={handleDragOver} onDragEnd={handleDragEnd}>
-          <div className="grid grid-cols-1 lg:grid-cols-[1.25fr_1fr_1.05fr] gap-4 items-start">
-            {['left', 'mid', 'right'].map((col) => (
-              <DroppableColumn key={col} id={col} items={activeLayout[col] ?? []} unlocked={unlocked} isAnyDragging={!!activeId} tileMap={tileMap} />
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-[1.25fr_1fr_1.05fr] gap-4 items-start">
+            {['left', 'mid', 'right', 'far'].map((col) => (
+              <div key={col} className={[
+                col === 'right' ? 'md:col-span-2 lg:col-span-1' : '',
+                col === 'far'   ? 'hidden' : '',
+              ].filter(Boolean).join(' ') || undefined}>
+                <DroppableColumn id={col} items={activeLayout[col] ?? []} unlocked={unlocked} isAnyDragging={!!activeId} tileMap={tileMap} onRemoveTile={removeTileFromLayout} availableTiles={availableTiles} onAddTile={addTileToColumn} />
+              </div>
             ))}
           </div>
 

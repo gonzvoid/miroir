@@ -1,4 +1,4 @@
-import { app, BrowserWindow, ipcMain, dialog, protocol, net } from 'electron';
+import { app, BrowserWindow, ipcMain, dialog, protocol, net, shell } from 'electron';
 import { fileURLToPath } from 'url';
 import { pathToFileURL } from 'url';
 import path from 'path';
@@ -189,6 +189,7 @@ ipcMain.handle('win:minimize',    () => win?.minimize());
 ipcMain.handle('win:maximize',    () => { if (win?.isMaximized()) win.restore(); else win?.maximize(); });
 ipcMain.handle('win:close',       () => win?.close());
 ipcMain.handle('win:isMaximized', () => win?.isMaximized() ?? false);
+ipcMain.handle('shell:openExternal', (_e, url) => shell.openExternal(url));
 
 /* ---------------- IPC: image folder ---------------- */
 const IMG_EXT = new Set(['.jpg', '.jpeg', '.png', '.webp', '.gif', '.avif']);
