@@ -64,7 +64,7 @@ export default function Focal({
     <section className="bg-surface rounded-focal p-7 pb-6 shadow-lg">
       <div className="flex justify-between items-baseline mb-5">
         <div>
-          <div className="text-[21px] font-semibold tracking-tight">Things to do</div>
+          <div className="text-[15px] font-semibold tracking-tight">Things to do</div>
           <div className="text-[13px] text-text-2 mt-1">Across every project, by when it matters</div>
         </div>
         <div className="text-[13px] text-text-2">

@@ -123,6 +123,9 @@ export const TILE_CATALOG = [
   { id:'inspolinks', label:'Inspiration links' },
   { id:'plants',     label:'Plant tracker' },
   { id:'social',     label:'Social planner' },
+  { id:'sun',        label:'Sun arc'        },
+  { id:'moon',       label:'Moon phase'     },
+  { id:'weather',    label:'Weather orb'    },
 ];
 
 // Accent colour presets — id maps to data-accent attribute

@@ -647,8 +647,8 @@ export function CalCard({ viewMonth, setViewMonth, events, calendars, addEvent }
           <div className="flex bg-surface-2 rounded-full p-0.5">
             {['month', 'week', 'day'].map((v) => (
               <button key={v} onClick={() => setView(v)}
-                className={`text-[10.5px] px-2.5 py-[3px] rounded-full capitalize ${view === v ? 'bg-surface text-text font-medium shadow-sm' : 'text-text-3'}`}>
-                {v}
+                className={`text-[10.5px] px-2.5 py-[3px] rounded-full ${view === v ? 'bg-surface text-text font-medium shadow-sm' : 'text-text-3'}`}>
+                {{ month: 'M', week: 'W', day: 'D' }[v]}
               </button>
             ))}
           </div>
@@ -2487,6 +2487,501 @@ export function SocialPlannerTile({ planner, setPlanner }) {
         </button>
       )}
     </Card>
+  );
+}
+
+/* ─────────────────────────────────────────────────────────────
+   Ambient tile helpers — solar / lunar / weather calculations
+───────────────────────────────────────────────────────────── */
+function calcSunTimes(lat, lon) {
+  const date = new Date();
+  const toR  = (d) => d * Math.PI / 180;
+  const JD   = date / 86400000 + 2440587.5;
+  const n    = JD - 2451545.0;
+  const L    = (280.460 + 0.9856474 * n) % 360;
+  const g    = toR((357.528 + 0.9856003 * n) % 360);
+  const lam  = toR(L + 1.915 * Math.sin(g) + 0.02 * Math.sin(2 * g));
+  const eps  = toR(23.439 - 4e-7 * n);
+  const dec  = Math.asin(Math.sin(eps) * Math.sin(lam));
+  const ch   = (Math.cos(toR(90.833)) - Math.sin(toR(lat)) * Math.sin(dec))
+             / (Math.cos(toR(lat)) * Math.cos(dec));
+  if (Math.abs(ch) > 1) return { rise: 6, set: 18 };
+  const H    = Math.acos(ch) * 180 / Math.PI;
+  const EqT  = 4 * (180 / Math.PI) * (
+    0.000075 + 0.001868 * Math.cos(g) - 0.032077 * Math.sin(g)
+    - 0.014615 * Math.cos(2 * g) - 0.04089 * Math.sin(2 * g)
+  );
+  const noon = (720 - 4 * lon - EqT) / 60;
+  const off  = -date.getTimezoneOffset() / 60;
+  return { rise: noon - H / 15 + off, set: noon + H / 15 + off };
+}
+
+function fmtHour(h) {
+  const total = ((h % 24) + 24) % 24;
+  const hh    = Math.floor(total);
+  const mm    = Math.round((total - hh) * 60);
+  const ampm  = hh >= 12 ? 'pm' : 'am';
+  const h12   = hh % 12 || 12;
+  return `${h12}:${String(mm).padStart(2, '0')} ${ampm}`;
+}
+
+function calcMoonPhase() {
+  const JD    = Date.now() / 86400000 + 2440587.5;
+  const cycle = 29.53058867;
+  return ((JD - 2451550.26) % cycle + cycle) % cycle;
+}
+
+function moonLitPath(cx, cy, r, phase) {
+  const p  = phase / 29.53;
+  const kx = Math.cos(Math.PI * (1 - 2 * p));
+  const rx = Math.abs(kx) * r;
+  const ts = kx < 0 ? 1 : 0;
+  const T  = `${cx},${cy - r}`;
+  const B  = `${cx},${cy + r}`;
+  return p <= 0.5
+    ? `M${T} A${r},${r} 0 0,1 ${B} A${rx},${r} 0 0,${ts} ${T}Z`
+    : `M${T} A${r},${r} 0 0,0 ${B} A${rx},${r} 0 0,${ts} ${T}Z`;
+}
+
+function moonPhaseName(phase) {
+  const p = phase / 29.53;
+  if (p < 0.02 || p > 0.98) return 'New Moon';
+  if (p < 0.23) return 'Waxing Crescent';
+  if (p < 0.27) return 'First Quarter';
+  if (p < 0.48) return 'Waxing Gibbous';
+  if (p < 0.52) return 'Full Moon';
+  if (p < 0.73) return 'Waning Gibbous';
+  if (p < 0.77) return 'Third Quarter';
+  return 'Waning Crescent';
+}
+
+/* ─────────────────────────────────────────────────────────────
+   Sun Arc — daily sun position on a semicircular arc
+───────────────────────────────────────────────────────────── */
+export function SunArcTile({ lat = 40.4168, lon = -3.7038 }) {
+  const [, setTick] = useState(0);
+  useEffect(() => {
+    const id = setInterval(() => setTick((t) => t + 1), 60000);
+    return () => clearInterval(id);
+  }, []);
+
+  const now  = new Date();
+  const nowH = now.getHours() + now.getMinutes() / 60;
+  const { rise, set } = calcSunTimes(lat, lon);
+
+  const W = 260, H = 190, R = 108, cx = 130, cy = 162;
+  const t     = Math.max(0, Math.min(1, (nowH - rise) / (set - rise)));
+  const isDay = nowH >= rise && nowH <= set;
+  const angle = Math.PI * (1 - t);
+  const sunX  = cx + R * Math.cos(angle);
+  const sunY  = cy - R * Math.sin(angle);
+
+  return (
+    <section className="bg-surface rounded-card shadow-sm overflow-hidden">
+      <svg width="100%" viewBox={`0 0 ${W} ${H}`} style={{ display: 'block' }}>
+        <defs>
+          <radialGradient id="sa-orb" cx={sunX} cy={sunY} r="30" gradientUnits="userSpaceOnUse">
+            <stop offset="0%"   stopColor="#b83220" stopOpacity="0.97" />
+            <stop offset="32%"  stopColor="#d94020" stopOpacity="0.92" />
+            <stop offset="62%"  stopColor="#f97316" stopOpacity="0.80" />
+            <stop offset="90%"  stopColor="#ffb347" stopOpacity="0.40" />
+            <stop offset="100%" stopColor="#fdf8f3"  stopOpacity="0"   />
+          </radialGradient>
+          <radialGradient id="sa-night" cx={sunX} cy={sunY} r="30" gradientUnits="userSpaceOnUse">
+            <stop offset="0%"   stopColor="#2838a0" stopOpacity="0.88" />
+            <stop offset="55%"  stopColor="#3848b8" stopOpacity="0.55" />
+            <stop offset="100%" stopColor="#4060d0"  stopOpacity="0"   />
+          </radialGradient>
+          <filter id="sa-noise">
+            <feTurbulence type="fractalNoise" baseFrequency="0.72" numOctaves="4" seed="7" result="noise" />
+            <feColorMatrix in="noise" type="matrix"
+              values="0 0 0 0 0  0 0 0 0 0  0 0 0 0 0  0 0 0 0.07 0" result="noiseMask" />
+            <feComposite in="noiseMask" in2="SourceGraphic" operator="in" result="masked" />
+            <feBlend in="SourceGraphic" in2="masked" mode="overlay" />
+          </filter>
+          <linearGradient id="sa-arc" x1="0" y1="0" x2="1" y2="0">
+            <stop offset="0%"   stopColor="#4060b0" stopOpacity="0.30" />
+            <stop offset="18%"  stopColor="#e07020" stopOpacity="0.52" />
+            <stop offset="50%"  stopColor="#ffb860" stopOpacity="0.62" />
+            <stop offset="82%"  stopColor="#e07020" stopOpacity="0.52" />
+            <stop offset="100%" stopColor="#4060b0" stopOpacity="0.30" />
+          </linearGradient>
+        </defs>
+
+        <rect width={W} height={H} fill="var(--surface)" />
+
+        {/* Horizon line */}
+        <line x1={cx - R - 14} y1={cy} x2={cx + R + 14} y2={cy}
+          stroke="var(--text-3)" strokeWidth="0.7" strokeOpacity="0.30" />
+
+        {/* Full arc */}
+        <path d={`M ${cx - R} ${cy} A ${R} ${R} 0 0 1 ${cx + R} ${cy}`}
+          fill="none" stroke="url(#sa-arc)" strokeWidth="1.2" strokeLinecap="round" />
+
+        {/* Progress arc (sunrise → now) */}
+        {isDay && t > 0.01 && (
+          <path d={`M ${cx - R} ${cy} A ${R} ${R} 0 0 1 ${sunX} ${sunY}`}
+            fill="none" stroke="#f97316" strokeWidth="1.7"
+            strokeLinecap="round" strokeOpacity="0.82" />
+        )}
+
+        {/* Sun orb */}
+        <circle cx={sunX} cy={sunY} r={19}
+          fill={`url(#${isDay ? 'sa-orb' : 'sa-night'})`}
+          filter="url(#sa-noise)" />
+
+        {/* Horizon tick marks */}
+        <line x1={cx - R} y1={cy - 5} x2={cx - R} y2={cy + 5}
+          stroke="var(--text-3)" strokeWidth="0.8" strokeOpacity="0.40" />
+        <line x1={cx + R} y1={cy - 5} x2={cx + R} y2={cy + 5}
+          stroke="var(--text-3)" strokeWidth="0.8" strokeOpacity="0.40" />
+
+        {/* Sunrise / sunset labels */}
+        <text x={cx - R} y={cy + 15} textAnchor="middle"
+          fontSize="8.5" fill="var(--text-3)" fontFamily="inherit">
+          {fmtHour(rise)}
+        </text>
+        <text x={cx + R} y={cy + 15} textAnchor="middle"
+          fontSize="8.5" fill="var(--text-3)" fontFamily="inherit">
+          {fmtHour(set)}
+        </text>
+
+        {/* Tile label */}
+        <text x={14} y={17} fontSize="8.5" fill="var(--text-3)"
+          fontFamily="inherit" letterSpacing="0.10em">
+          SUN
+        </text>
+
+        {/* Current time above sun dot */}
+        {isDay && (
+          <text x={sunX} y={Math.max(sunY - 24, 26)} textAnchor="middle"
+            fontSize="8.5" fill="var(--text-2)" fontFamily="inherit">
+            {fmtHour(nowH)}
+          </text>
+        )}
+      </svg>
+    </section>
+  );
+}
+
+/* ─────────────────────────────────────────────────────────────
+   Moon Phase — current lunar phase as an SVG orb
+───────────────────────────────────────────────────────────── */
+export function MoonPhaseTile() {
+  const phase = calcMoonPhase();
+  const W = 260, H = 240;
+  const cx = W / 2, cy = H / 2 - 10;
+  const r   = 72;
+  const illum = Math.round(((1 - Math.cos((phase / 29.53) * 2 * Math.PI)) / 2) * 100);
+
+  return (
+    <section className="bg-surface rounded-card shadow-sm overflow-hidden">
+      <svg width="100%" viewBox={`0 0 ${W} ${H}`} style={{ display: 'block' }}>
+        <defs>
+          <radialGradient id="mp-lit" cx={cx - 10} cy={cy - 15} r={r * 1.1}
+            gradientUnits="userSpaceOnUse">
+            <stop offset="0%"   stopColor="#fffde8" />
+            <stop offset="40%"  stopColor="#f5e498" />
+            <stop offset="100%" stopColor="#d4b850" />
+          </radialGradient>
+          <radialGradient id="mp-dark" cx={cx + 12} cy={cy + 12} r={r}
+            gradientUnits="userSpaceOnUse">
+            <stop offset="0%"   stopColor="#1c2358" />
+            <stop offset="100%" stopColor="#080c20" />
+          </radialGradient>
+          <filter id="mp-noise">
+            <feTurbulence type="fractalNoise" baseFrequency="0.65" numOctaves="4" seed="12" result="noise" />
+            <feColorMatrix in="noise" type="matrix"
+              values="0 0 0 0 0  0 0 0 0 0  0 0 0 0 0  0 0 0 0.09 0" result="noiseMask" />
+            <feComposite in="noiseMask" in2="SourceGraphic" operator="in" result="masked" />
+            <feBlend in="SourceGraphic" in2="masked" mode="overlay" />
+          </filter>
+          <clipPath id="mp-clip">
+            <circle cx={cx} cy={cy} r={r} />
+          </clipPath>
+        </defs>
+
+        <rect width={W} height={H} fill="var(--surface)" />
+
+        {/* Dark side — earthshine faintly visible */}
+        <circle cx={cx} cy={cy} r={r} fill="url(#mp-dark)" filter="url(#mp-noise)" />
+
+        {/* Lit portion */}
+        {illum > 0 && (
+          <path d={moonLitPath(cx, cy, r, phase)}
+            fill="url(#mp-lit)" filter="url(#mp-noise)"
+            clipPath="url(#mp-clip)" />
+        )}
+
+        {/* Limb ring */}
+        <circle cx={cx} cy={cy} r={r} fill="none"
+          stroke="rgba(255,255,255,0.10)" strokeWidth="0.8" />
+
+        {/* Tile label */}
+        <text x={14} y={17} fontSize="8.5" fill="var(--text-3)"
+          fontFamily="inherit" letterSpacing="0.10em">
+          MOON
+        </text>
+
+        {/* Phase name */}
+        <text x={cx} y={cy + r + 22} textAnchor="middle"
+          fontSize="10.5" fill="var(--text-2)" fontFamily="inherit">
+          {moonPhaseName(phase)}
+        </text>
+
+        {/* Illumination */}
+        <text x={cx} y={cy + r + 38} textAnchor="middle"
+          fontSize="8.5" fill="var(--text-3)" fontFamily="inherit">
+          {illum}% illuminated
+        </text>
+      </svg>
+    </section>
+  );
+}
+
+/* ─────────────────────────────────────────────────────────────
+   Weather tile — full-bleed multi-stop gradient
+   Each temperature anchor has a curated 6-stop palette.
+   Stops are interpolated independently between anchors.
+   Uses OpenMeteo (free, no key) + navigator.geolocation
+───────────────────────────────────────────────────────────── */
+const _h2r = (h) => { const v = parseInt(h.slice(1), 16); return [(v >> 16) & 255, (v >> 8) & 255, v & 255]; };
+
+// Palettes from the BLUR gradient tool — Peach for warm, Ocean for cold
+// s[0..4] = blob colors (mixed placements); s[5] = tile background base
+const WX_WARM = ['#ee9e81', '#FF6B35', '#ec9db1', '#FFBE0B', '#f39468', '#fce8d5']; // Peach — warm cream base
+const WX_COLD = ['#03045E', '#0077B6', '#00B4D8', '#48CAE4', '#90E0EF', '#caf0f8']; // Ocean
+
+function wxMultiStops(temp) {
+  return temp >= 18 ? WX_WARM : WX_COLD;
+}
+
+function wxCondLabel(code) {
+  if (code === 0)  return 'Clear';
+  if (code <= 1)   return 'Mostly Clear';
+  if (code <= 2)   return 'Partly Cloudy';
+  if (code <= 3)   return 'Overcast';
+  if (code <= 48)  return 'Foggy';
+  if (code <= 55)  return 'Drizzle';
+  if (code <= 65)  return 'Rainy';
+  if (code <= 67)  return 'Freezing Rain';
+  if (code <= 75)  return 'Snowing';
+  if (code <= 77)  return 'Snow Grains';
+  if (code <= 82)  return 'Showers';
+  if (code <= 86)  return 'Snow Showers';
+  return 'Thunderstorm';
+}
+
+const WX_GRAIN = `url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.72' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E")`;
+
+// Seeded PRNG — xorshift32, seed is the current date (YYYYMMDD)
+function seededRng(seed) {
+  let s = (seed ^ 0xdeadbeef) >>> 0 || 1;
+  return () => { s ^= s << 13; s ^= s >>> 17; s ^= s << 5; return (s >>> 0) / 4294967296; };
+}
+
+export function WeatherOrbTile({ lat = 40.4168, lon = -3.7038 }) {
+  const [wx, setWx]         = useState(null);
+  const [coords, setCoords] = useState({ lat, lon });
+  const [city, setCity]     = useState('');
+  const [split, setSplit]   = useState(false);
+
+  useEffect(() => {
+    navigator.geolocation?.getCurrentPosition(
+      ({ coords: c }) => setCoords({ lat: c.latitude, lon: c.longitude }),
+      () => {}
+    );
+  }, []);
+
+  // Reverse geocode to city name via Nominatim
+  useEffect(() => {
+    let alive = true;
+    fetch(`https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${coords.lat}&lon=${coords.lon}&zoom=10`, {
+      headers: { 'Accept-Language': 'en' },
+    })
+      .then((r) => r.json())
+      .then((d) => {
+        const place   = d.address?.city || d.address?.town || d.address?.village || d.name || '';
+        const country = d.address?.country || '';
+        if (alive) setCity(place && country ? `${place}, ${country}` : place || country);
+      })
+      .catch(() => {});
+    return () => { alive = false; };
+  }, [coords.lat, coords.lon]);
+
+  useEffect(() => {
+    let alive = true;
+    const load = async () => {
+      try {
+        const url  = `https://api.open-meteo.com/v1/forecast?latitude=${coords.lat}&longitude=${coords.lon}&current=temperature_2m,weathercode,is_day,relative_humidity_2m&temperature_unit=celsius&timezone=auto`;
+        const data = await fetch(url).then((r) => r.json());
+        if (alive) setWx(data.current);
+      } catch { /* silent */ }
+    };
+    load();
+    const id = setInterval(load, 15 * 60 * 1000);
+    return () => { alive = false; clearInterval(id); };
+  }, [coords.lat, coords.lon]);
+
+  const rawTemp  = wx?.temperature_2m ?? null;
+  const humidity = wx?.relative_humidity_2m ?? null;
+  const code     = wx?.weathercode ?? 0;
+  const isDay    = wx ? wx.is_day === 1 : new Date().getHours() >= 6 && new Date().getHours() < 20;
+
+  const fmtDeg = (v, pos, neg) => `${Math.abs(v).toFixed(2)}° ${v >= 0 ? pos : neg}`;
+  const coordsStr = `${fmtDeg(coords.lat, 'N', 'S')}  ${fmtDeg(coords.lon, 'E', 'W')}`;
+
+  // 6 palette stops from temperature
+  const stops = wxMultiStops(rawTemp ?? 20);
+
+  // Daily seed: stable within a day, changes at midnight
+  const now  = new Date();
+  const seed = now.getFullYear() * 10000 + (now.getMonth() + 1) * 100 + now.getDate();
+  const rng  = seededRng(seed);
+
+  // Pure CSS multi-radial gradient — same technique as OrbFace, no DOM blobs needed.
+  // High-opacity stops at centre (0.94) drop to transparent by 58%, giving saturated
+  // colour contrast instead of the washed-out average produced by 130% blurred divs.
+  const rgba = (hex, a) => { const [r,g,b] = _h2r(hex); return `rgba(${r},${g},${b},${a})`; };
+
+  const b1 = [48 + rng() * 44, 52 + rng() * 42];
+  const b2 = [5  + rng() * 38, 46 + rng() * 46];
+  const b3 = [52 + rng() * 42, 5  + rng() * 40];
+  const b4 = [5  + rng() * 52, 5  + rng() * 48];
+
+  const tileBackground = [
+    `radial-gradient(ellipse 88% 82% at ${b1[0].toFixed(1)}% ${b1[1].toFixed(1)}%, ${rgba(stops[1], 0.94)} 0%, ${rgba(stops[1], 0.60)} 28%, transparent 58%)`,
+    `radial-gradient(ellipse 76% 72% at ${b2[0].toFixed(1)}% ${b2[1].toFixed(1)}%, ${rgba(stops[3], 0.90)} 0%, ${rgba(stops[3], 0.44)} 30%, transparent 56%)`,
+    `radial-gradient(ellipse 66% 66% at ${b3[0].toFixed(1)}% ${b3[1].toFixed(1)}%, ${rgba(stops[2], 0.86)} 0%, ${rgba(stops[2], 0.32)} 34%, transparent 55%)`,
+    `radial-gradient(ellipse 58% 58% at ${b4[0].toFixed(1)}% ${b4[1].toFixed(1)}%, ${rgba(stops[0], 0.80)} 0%, ${rgba(stops[0], 0.18)} 36%, transparent 52%)`,
+    stops[5],
+  ].join(', ');
+
+  const tempStr = rawTemp !== null ? `${Math.round(rawTemp)}°` : '–';
+  const ink     = (a) => `rgba(55,22,10,${a})`;
+
+  // Sun arc data (used in split view)
+  const { rise, set } = calcSunTimes(coords.lat, coords.lon);
+  const nowH    = now.getHours() + now.getMinutes() / 60;
+  const sunT    = Math.max(0, Math.min(1, (nowH - rise) / (set - rise)));
+  const isSunUp = nowH >= rise && nowH <= set;
+  // Vertical arc: rises from bottom, peaks right at noon, reaches top at sunset
+  const acx = 22, acy = 65, aR = 50;
+  const sx = acx + aR * Math.sin(Math.PI * sunT);
+  const sy = acy + aR * Math.cos(Math.PI * sunT);
+  const daylightH   = Math.floor(set - rise);
+  const daylightMin = Math.round(((set - rise) % 1) * 60);
+
+  const grain = (
+    <div className="absolute inset-0 pointer-events-none" style={{
+      opacity: 0.18, backgroundImage: WX_GRAIN, backgroundSize: '256px 256px', mixBlendMode: 'overlay',
+    }} />
+  );
+
+  // Toggle icon
+  const ToggleBtn = () => (
+    <button
+      onClick={() => setSplit(v => !v)}
+      className="absolute top-2.5 right-2.5 z-20 flex items-center justify-center rounded-full"
+      style={{ width: 22, height: 22, background: ink(0.08), border: 'none', cursor: 'pointer', flexShrink: 0 }}
+      title={split ? 'Full view' : 'Split view'}
+    >
+      <svg width="11" height="11" viewBox="0 0 11 11" fill="none">
+        {split ? (
+          <rect x="1" y="1" width="9" height="9" rx="1.5" stroke={ink(0.45)} strokeWidth="1.1"/>
+        ) : (
+          <>
+            <rect x="1"   y="1" width="3.8" height="9" rx="1.2" stroke={ink(0.45)} strokeWidth="1.1"/>
+            <rect x="6.2" y="1" width="3.8" height="9" rx="1.2" stroke={ink(0.45)} strokeWidth="1.1"/>
+          </>
+        )}
+      </svg>
+    </button>
+  );
+
+  if (!split) {
+    return (
+      <section className="rounded-card overflow-hidden relative" style={{ minHeight: 200, background: stops[5] }}>
+        <div className="absolute inset-0" style={{ background: tileBackground, filter: 'blur(32px)', transform: 'scale(1.18)' }} />
+        {grain}
+        <ToggleBtn />
+        <div className="absolute inset-0 z-10 flex flex-col items-center justify-center text-center" style={{ padding: '20px 24px' }}>
+          <span style={{ fontSize: 11, letterSpacing: '0.06em', color: ink(0.42) }}>
+            {wx ? wxCondLabel(code) : ''}
+          </span>
+          <div className="font-semibold tracking-tight leading-none mt-1" style={{ fontSize: 78, color: ink(0.68) }}>
+            {tempStr}
+          </div>
+          {city && (
+            <div className="font-medium leading-snug mt-2" style={{ fontSize: 22, color: ink(0.55) }}>
+              {city}
+            </div>
+          )}
+          <div className="flex flex-col items-center gap-0.5 mt-3">
+            {humidity !== null && (
+              <span style={{ fontSize: 11, color: ink(0.38) }}>{humidity}% humidity</span>
+            )}
+            <span style={{ fontSize: 10, color: ink(0.28), fontVariantNumeric: 'tabular-nums' }}>
+              {coordsStr}
+            </span>
+          </div>
+        </div>
+      </section>
+    );
+  }
+
+  // ── Split view ──────────────────────────────────────────────
+  return (
+    <section className="relative flex" style={{ minHeight: 200, gap: 8 }}>
+
+      {/* Left card: gradient + weather */}
+      <div className="relative rounded-card overflow-hidden flex flex-col items-center justify-center text-center"
+        style={{ flex: '0 0 calc(70% - 4px)', background: stops[5], padding: '20px 14px' }}>
+        <div className="absolute inset-0" style={{ background: tileBackground, filter: 'blur(32px)', transform: 'scale(1.18)' }} />
+        {grain}
+        <div className="relative z-10 flex flex-col items-center">
+          <span style={{ fontSize: 10, letterSpacing: '0.06em', color: ink(0.40) }}>
+            {wx ? wxCondLabel(code) : ''}
+          </span>
+          <div className="font-semibold tracking-tight leading-none mt-1" style={{ fontSize: 58, color: ink(0.68) }}>
+            {tempStr}
+          </div>
+          {city && (
+            <div className="font-medium leading-snug mt-2" style={{ fontSize: 14, color: ink(0.52) }}>
+              {city}
+            </div>
+          )}
+          <div className="flex flex-col items-center gap-0.5 mt-2">
+            {humidity !== null && (
+              <span style={{ fontSize: 10, color: ink(0.36) }}>{humidity}% humidity</span>
+            )}
+            <span style={{ fontSize: 9, color: ink(0.24), fontVariantNumeric: 'tabular-nums' }}>
+              {coordsStr}
+            </span>
+          </div>
+        </div>
+      </div>
+
+      {/* Right card: sun arc */}
+      <div className="relative rounded-card flex flex-col items-center justify-center flex-1"
+        style={{ background: 'var(--surface)', padding: '16px 14px 14px' }}>
+        <ToggleBtn />
+
+        <div className="flex flex-col justify-center w-full" style={{ gap: 0, flex: 1 }}>
+          <span style={{ fontSize: 8, letterSpacing: '.10em', color: 'var(--text-3)', textTransform: 'uppercase' }}>Sunrise</span>
+          <span style={{ fontSize: 19, fontWeight: 500, color: 'var(--text)', lineHeight: 1.15, marginTop: 2 }}>{fmtHour(rise)}</span>
+
+          <div style={{ height: '0.5px', background: 'var(--stroke)', margin: '10px 0' }} />
+
+          <span style={{ fontSize: 8, letterSpacing: '.10em', color: 'var(--text-3)', textTransform: 'uppercase' }}>Sunset</span>
+          <span style={{ fontSize: 19, fontWeight: 500, color: 'var(--text)', lineHeight: 1.15, marginTop: 2 }}>{fmtHour(set)}</span>
+
+          <div style={{ marginTop: 12 }}>
+            <span style={{ fontSize: 9, color: 'var(--text-3)', letterSpacing: '.02em' }}>{daylightH}h {daylightMin}m daylight</span>
+          </div>
+        </div>
+      </div>
+    </section>
   );
 }
 

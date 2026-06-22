@@ -41,10 +41,9 @@ let win;
 
 function createWindow() {
   win = new BrowserWindow({
-    width: 1292,
-    height: 900,
-    minWidth: 1292,
-    maxWidth: 1292,
+    width: 1440,
+    height: 960,
+    minWidth: 980,
     backgroundColor: '#f4f4f2',
     frame: false,
     autoHideMenuBar: true,

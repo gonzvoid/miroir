@@ -161,7 +161,7 @@ export default function ImageTile({ albums, setAlbums }) {
             <div key={alb.id} className="flex items-center shrink-0">
               <button
                 onClick={() => setActiveIdx(idx)}
-                className="text-[11px] font-medium px-2.5 py-1 rounded-full transition-all whitespace-nowrap"
+                className="text-[11px] font-medium px-2.5 py-1 rounded-full transition-[background-color,color] whitespace-nowrap"
                 style={{
                   background: idx === safeIdx ? 'rgba(255,255,255,0.9)' : 'rgba(255,255,255,0.2)',
                   color: idx === safeIdx ? '#111' : 'rgba(255,255,255,0.85)',
@@ -192,6 +192,6 @@ export default function ImageTile({ albums, setAlbums }) {
 }
 
 const Btn = ({ children, onClick }) => (
-  <button onClick={onClick} className="w-[30px] h-[30px] grid place-items-center rounded-full text-white"
+  <button onClick={onClick} className="w-10 h-10 grid place-items-center rounded-full text-white"
     style={{ background: 'rgba(255,255,255,.18)', backdropFilter: 'blur(8px)' }}>{children}</button>
 );

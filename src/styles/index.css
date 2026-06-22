@@ -60,8 +60,8 @@ html, body { margin: 0; background: transparent; color: var(--text); font-family
 ::-webkit-scrollbar-thumb:hover { background: var(--text-3); }
 
 /* ── Micro-interaction polish ─────────────────────────────── */
-button { user-select: none; }
-button:active:not([disabled]) { opacity: 0.78; }
+button { user-select: none; transition: color 0.15s ease, background-color 0.15s ease, transform 0.12s cubic-bezier(0.2, 0, 0, 1); }
+button:active:not([disabled]) { transform: scale(0.96); }
 input, textarea, select { transition: border-color 0.15s ease; }
 
 /* smooth collapsible — toggle max-h via JS class to animate height */

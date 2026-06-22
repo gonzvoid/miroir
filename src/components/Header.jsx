@@ -59,6 +59,52 @@ function ColorSwatch({ current, onChange }) {
   );
 }
 
+/* ── Sticky top bar — always visible ── */
+export function TopBar({ theme, setTheme, unlocked, setUnlocked, onOpenLayoutEditor, onOpenSettings }) {
+  return (
+    <div className="titlebar-drag flex items-center justify-between h-8">
+      <div className="flex items-center gap-0.5">
+        <button onClick={onOpenLayoutEditor} title="Edit layout"
+          className="w-8 h-8 grid place-items-center text-text-3 hover:text-text hover:bg-surface-2 rounded-lg transition-colors">
+          <GridIcon size={14} />
+        </button>
+        <button onClick={() => setUnlocked((v) => !v)} title={unlocked ? 'Lock layout' : 'Unlock layout'}
+          className={`w-8 h-8 grid place-items-center rounded-lg transition-colors ${unlocked ? 'text-accent' : 'text-text-3 hover:text-text hover:bg-surface-2'}`}>
+          {unlocked ? <LockOpen size={14} /> : <Lock size={14} />}
+        </button>
+        <button
+          onClick={() => setTheme(theme === 'light' ? 'dark' : theme === 'dark' ? 'cream' : 'light')}
+          title={`Switch to ${theme === 'light' ? 'dark' : theme === 'dark' ? 'cream' : 'light'} mode`}
+          className="w-8 h-8 grid place-items-center text-text-3 hover:text-text hover:bg-surface-2 rounded-lg transition-colors">
+          {theme === 'light' ? <Moon size={14} /> : theme === 'dark' ? <Leaf size={14} /> : <Sun size={14} />}
+        </button>
+        <button onClick={onOpenSettings} title="Settings"
+          className="w-8 h-8 grid place-items-center text-text-3 hover:text-text hover:bg-surface-2 rounded-lg transition-colors">
+          <Settings size={14} />
+        </button>
+      </div>
+
+      {typeof window !== 'undefined' && window.lumen?.winClose && (
+        <div className="flex items-center gap-0.5">
+          <button onClick={() => window.lumen.winMinimize()} title="Minimize"
+            className="w-8 h-8 grid place-items-center text-text-3 hover:text-text hover:bg-surface-2 rounded-lg transition-colors">
+            <WinMinIcon />
+          </button>
+          <button onClick={() => window.lumen.winMaximize()} title="Maximize"
+            className="w-8 h-8 grid place-items-center text-text-3 hover:text-text hover:bg-surface-2 rounded-lg transition-colors">
+            <WinMaxIcon />
+          </button>
+          <button onClick={() => window.lumen.winClose()} title="Close"
+            className="w-8 h-8 grid place-items-center text-text-3 hover:text-white hover:bg-[#c0564b] rounded-lg transition-colors">
+            <WinCloseIcon />
+          </button>
+        </div>
+      )}
+    </div>
+  );
+}
+
+/* ── Greeting + filter pills — scrolls with content ── */
 export default function Header({
   theme, setTheme, filter, setFilter, now, unlocked, setUnlocked,
   name, tags, setTags, onOpenLayoutEditor, onOpenSettings,
@@ -81,53 +127,7 @@ export default function Header({
   };
 
   return (
-    <div>
-      {/* Top strip — icons left, window controls right, flush to top */}
-      <div className="titlebar-drag flex items-center justify-between h-8 mb-2">
-
-        {/* LEFT: app action icons */}
-        <div className="flex items-center gap-0.5">
-          <button onClick={onOpenLayoutEditor} title="Edit layout"
-            className="w-8 h-8 grid place-items-center text-text-3 hover:text-text hover:bg-surface-2 rounded-lg transition-colors">
-            <GridIcon size={14} />
-          </button>
-          <button onClick={() => setUnlocked((v) => !v)} title={unlocked ? 'Lock layout' : 'Unlock layout'}
-            className={`w-8 h-8 grid place-items-center rounded-lg transition-colors ${unlocked ? 'text-accent' : 'text-text-3 hover:text-text hover:bg-surface-2'}`}>
-            {unlocked ? <LockOpen size={14} /> : <Lock size={14} />}
-          </button>
-          <button
-            onClick={() => setTheme(theme === 'light' ? 'dark' : theme === 'dark' ? 'cream' : 'light')}
-            title={`Switch to ${theme === 'light' ? 'dark' : theme === 'dark' ? 'cream' : 'light'} mode`}
-            className="w-8 h-8 grid place-items-center text-text-3 hover:text-text hover:bg-surface-2 rounded-lg transition-colors">
-            {theme === 'light' ? <Moon size={14} /> : theme === 'dark' ? <Leaf size={14} /> : <Sun size={14} />}
-          </button>
-          <button onClick={onOpenSettings} title="Settings"
-            className="w-8 h-8 grid place-items-center text-text-3 hover:text-text hover:bg-surface-2 rounded-lg transition-colors">
-            <Settings size={14} />
-          </button>
-        </div>
-
-        {/* RIGHT: window controls — Electron only */}
-        {typeof window !== 'undefined' && window.lumen?.winClose && (
-          <div className="flex items-center gap-0.5">
-            <button onClick={() => window.lumen.winMinimize()} title="Minimize"
-              className="w-8 h-8 grid place-items-center text-text-3 hover:text-text hover:bg-surface-2 rounded-lg transition-colors">
-              <WinMinIcon />
-            </button>
-            <button onClick={() => window.lumen.winMaximize()} title="Maximize"
-              className="w-8 h-8 grid place-items-center text-text-3 hover:text-text hover:bg-surface-2 rounded-lg transition-colors">
-              <WinMaxIcon />
-            </button>
-            <button onClick={() => window.lumen.winClose()} title="Close"
-              className="w-8 h-8 grid place-items-center text-text-3 hover:text-white hover:bg-[#c0564b] rounded-lg transition-colors">
-              <WinCloseIcon />
-            </button>
-          </div>
-        )}
-      </div>
-
-      {/* Main header — greeting + filter pills */}
-      <div className="titlebar-drag mb-5">
+    <div className="titlebar-drag mb-5">
         <div className="flex items-center justify-between gap-4">
 
           {/* left: greeting */}
@@ -135,7 +135,7 @@ export default function Header({
             <div className="text-[12px] text-text-2 mb-0.5">
               {now.toLocaleDateString('en-US', { weekday: 'long', day: 'numeric', month: 'long' })}
             </div>
-            <div className="text-[22px] font-semibold tracking-tight leading-none">{greeting}, {displayName}</div>
+            <div className="text-[22px] font-semibold tracking-tight leading-none" style={{ textWrap: 'balance' }}>{greeting}, {displayName}</div>
           </div>
 
           {/* filter pills + tag editor */}
@@ -170,7 +170,7 @@ export default function Header({
                     <input value={t.label} onChange={(e) => updateTag(t.id, { label: e.target.value })}
                       className="flex-1 text-[13px] bg-transparent outline-none min-w-0" />
                     <button onClick={() => deleteTag(t.id)}
-                      className="opacity-0 group-hover:opacity-100 text-text-3 hover:text-[#c0564b] p-0.5 transition-all shrink-0">
+                      className="opacity-0 group-hover:opacity-100 text-text-3 hover:text-[#c0564b] p-0.5 transition-opacity shrink-0">
                       <Trash2 size={12} />
                     </button>
                   </div>
@@ -201,6 +201,5 @@ export default function Header({
           </div>
         </div>
       </div>
-    </div>
   );
 }
