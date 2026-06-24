@@ -3,7 +3,7 @@
 @tailwind utilities;
 
 :root {
-  --m-great: #5b8c5a; --m-good: #9bc088; --m-okay: #e3b95e; --m-low: #e0925e; --m-rough: #d06b6b;
+  --m-great: #56b49a; --m-good: #86c6b0; --m-okay: #e6c877; --m-low: #eaa06a; --m-rough: #e17c84;
 }
 
 /* ── Base theme (Slate accent — default) ─────────────────────── */
@@ -53,7 +53,18 @@
 [data-theme="dark"] [data-accent="amber"]  { --accent:#FCD34D; --accent-tint:#451A03; --accent-text:#78350F; }
 
 * { box-sizing: border-box; }
-html, body { margin: 0; background: transparent; color: var(--text); font-family: 'Inter', system-ui, sans-serif; -webkit-font-smoothing: antialiased; }
+html, body {
+  margin: 0; background: transparent; color: var(--text);
+  font-family: 'Inter', system-ui, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  /* fancy Inter character variants: contextual alternates, case forms, stylistic sets */
+  font-feature-settings: 'liga' 1, 'calt' 1, 'case' 1, 'ss01' 1, 'ss03' 1,
+                         'cv01' 1, 'cv03' 1, 'cv04' 1, 'cv09' 1, 'cv11' 1;
+}
+/* use the variable font + automatic Display optical sizing where supported */
+@supports (font-variation-settings: normal) {
+  html, body { font-family: 'InterVariable', system-ui, sans-serif; font-optical-sizing: auto; }
+}
 ::-webkit-scrollbar { width: 6px; }
 ::-webkit-scrollbar-track { background: transparent; }
 ::-webkit-scrollbar-thumb { background: var(--stroke); border-radius: 99px; }
@@ -82,6 +93,30 @@ input, textarea, select { transition: border-color 0.15s ease; }
   to   { opacity: 1; transform: translateY(0); }
 }
 .tab-content { animation: tab-fade-in 0.16s ease-out; }
+
+/* ── Glass tile mode ──────────────────────────────────────── */
+[data-tile-style="glass"] .rounded-card,
+[data-tile-style="glass"] .rounded-focal {
+  background: rgba(244, 244, 242, 0.44) !important;
+  backdrop-filter: blur(16px) saturate(140%);
+  -webkit-backdrop-filter: blur(16px) saturate(140%);
+  border: 1px solid rgba(0, 0, 0, 0.06) !important;
+  box-shadow: none !important;
+}
+[data-tile-style="glass"][data-theme="dark"] .rounded-card,
+[data-tile-style="glass"][data-theme="dark"] .rounded-focal {
+  background: rgba(15, 16, 14, 0.55) !important;
+  border-color: rgba(255, 255, 255, 0.07) !important;
+}
+[data-tile-style="glass"][data-theme="cream"] .rounded-card,
+[data-tile-style="glass"][data-theme="cream"] .rounded-focal {
+  background: rgba(253, 248, 243, 0.44) !important;
+}
+
+/* day-orb drifting blobs (Mood tile) */
+@keyframes orb-a { 0%,100% { transform: translate(-7%,-5%) scale(1.05); } 50% { transform: translate(7%,6%) scale(1.12); } }
+@keyframes orb-b { 0%,100% { transform: translate(6%,-4%) scale(1.08); } 50% { transform: translate(-6%,5%) scale(1.0); } }
+@keyframes orb-c { 0%,100% { transform: translate(-4%,6%) scale(1.0); } 50% { transform: translate(5%,-6%) scale(1.1); } }
 
 /* digit-slot animation for FocusTile */
 @keyframes focus-digit-out {

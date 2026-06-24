@@ -21,4 +21,15 @@ contextBridge.exposeInMainWorld('lumen', {
   winMaximize:    () => ipcRenderer.invoke('win:maximize'),
   winClose:       () => ipcRenderer.invoke('win:close'),
   winIsMaximized: () => ipcRenderer.invoke('win:isMaximized'),
+  appVersion:     () => ipcRenderer.invoke('app:version'),
+  update: {
+    check:    () => ipcRenderer.invoke('update:check'),
+    download: () => ipcRenderer.invoke('update:download'),
+    install:  () => ipcRenderer.invoke('update:install'),
+    onStatus: (cb) => {
+      const listener = (_e, payload) => cb(payload);
+      ipcRenderer.on('update:status', listener);
+      return () => ipcRenderer.removeListener('update:status', listener);
+    },
+  },
 });

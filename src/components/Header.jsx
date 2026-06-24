@@ -59,31 +59,10 @@ function ColorSwatch({ current, onChange }) {
   );
 }
 
-/* ── Sticky top bar — always visible ── */
-export function TopBar({ theme, setTheme, unlocked, setUnlocked, onOpenLayoutEditor, onOpenSettings }) {
+/* ── Sticky top bar — window controls only ── */
+export function TopBar() {
   return (
-    <div className="titlebar-drag flex items-center justify-between h-8">
-      <div className="flex items-center gap-0.5">
-        <button onClick={onOpenLayoutEditor} title="Edit layout"
-          className="w-8 h-8 grid place-items-center text-text-3 hover:text-text hover:bg-surface-2 rounded-lg transition-colors">
-          <GridIcon size={14} />
-        </button>
-        <button onClick={() => setUnlocked((v) => !v)} title={unlocked ? 'Lock layout' : 'Unlock layout'}
-          className={`w-8 h-8 grid place-items-center rounded-lg transition-colors ${unlocked ? 'text-accent' : 'text-text-3 hover:text-text hover:bg-surface-2'}`}>
-          {unlocked ? <LockOpen size={14} /> : <Lock size={14} />}
-        </button>
-        <button
-          onClick={() => setTheme(theme === 'light' ? 'dark' : theme === 'dark' ? 'cream' : 'light')}
-          title={`Switch to ${theme === 'light' ? 'dark' : theme === 'dark' ? 'cream' : 'light'} mode`}
-          className="w-8 h-8 grid place-items-center text-text-3 hover:text-text hover:bg-surface-2 rounded-lg transition-colors">
-          {theme === 'light' ? <Moon size={14} /> : theme === 'dark' ? <Leaf size={14} /> : <Sun size={14} />}
-        </button>
-        <button onClick={onOpenSettings} title="Settings"
-          className="w-8 h-8 grid place-items-center text-text-3 hover:text-text hover:bg-surface-2 rounded-lg transition-colors">
-          <Settings size={14} />
-        </button>
-      </div>
-
+    <div className="titlebar-drag flex items-center justify-end h-8 pr-1.5">
       {typeof window !== 'undefined' && window.lumen?.winClose && (
         <div className="flex items-center gap-0.5">
           <button onClick={() => window.lumen.winMinimize()} title="Minimize"
@@ -100,6 +79,44 @@ export function TopBar({ theme, setTheme, unlocked, setUnlocked, onOpenLayoutEdi
           </button>
         </div>
       )}
+    </div>
+  );
+}
+
+/* ── Bottom dock pill — layout + settings controls ── */
+export function BottomDock({ theme, setTheme, unlocked, setUnlocked, onOpenLayoutEditor, onOpenSettings, hasBg, updateReady }) {
+  return (
+    <div className="flex items-center gap-0.5 px-1.5 py-1" style={{
+      background: hasBg ? 'color-mix(in srgb, var(--surface) 75%, transparent)' : 'var(--surface)',
+      backdropFilter: hasBg ? 'blur(16px) saturate(140%)' : undefined,
+      WebkitBackdropFilter: hasBg ? 'blur(16px) saturate(140%)' : undefined,
+      border: '1px solid var(--stroke)',
+      borderRadius: 99,
+      boxShadow: '0 2px 16px -6px rgba(0,0,0,0.15), 0 1px 4px rgba(0,0,0,0.06)',
+    }}>
+      <button onClick={onOpenLayoutEditor} title="Edit layout"
+        className="w-8 h-8 grid place-items-center text-text-3 hover:text-text hover:bg-surface-2 rounded-full transition-colors">
+        <GridIcon size={14} />
+      </button>
+      <button onClick={() => setUnlocked((v) => !v)} title={unlocked ? 'Lock layout' : 'Unlock layout'}
+        className={`w-8 h-8 grid place-items-center rounded-full transition-colors ${unlocked ? 'text-accent' : 'text-text-3 hover:text-text hover:bg-surface-2'}`}>
+        {unlocked ? <LockOpen size={14} /> : <Lock size={14} />}
+      </button>
+      <div className="w-px h-4 mx-1" style={{ background: 'var(--stroke)' }} />
+      <button
+        onClick={() => setTheme(theme === 'light' ? 'dark' : theme === 'dark' ? 'cream' : 'light')}
+        title={`Switch to ${theme === 'light' ? 'dark' : theme === 'dark' ? 'cream' : 'light'} mode`}
+        className="w-8 h-8 grid place-items-center text-text-3 hover:text-text hover:bg-surface-2 rounded-full transition-colors">
+        {theme === 'light' ? <Moon size={14} /> : theme === 'dark' ? <Leaf size={14} /> : <Sun size={14} />}
+      </button>
+      <button onClick={onOpenSettings} title={updateReady ? 'Update available — open Settings' : 'Settings'}
+        className="relative w-8 h-8 grid place-items-center text-text-3 hover:text-text hover:bg-surface-2 rounded-full transition-colors">
+        <Settings size={14} />
+        {updateReady && (
+          <span className="absolute top-1 right-1 w-2 h-2 rounded-full"
+            style={{ background: 'var(--accent)', boxShadow: '0 0 0 2px var(--surface)' }} />
+        )}
+      </button>
     </div>
   );
 }
@@ -127,7 +144,7 @@ export default function Header({
   };
 
   return (
-    <div className="titlebar-drag mb-5">
+    <div className="mb-5">
         <div className="flex items-center justify-between gap-4">
 
           {/* left: greeting */}

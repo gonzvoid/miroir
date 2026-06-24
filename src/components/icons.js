@@ -5,4 +5,5 @@ export {
   Shuffle, CheckSquare, Calendar as CalIcon, Mic, Lightbulb,
   MoreVertical, GripVertical, Lock, LockOpen, Settings,
   Globe, Clock, Droplets, Leaf, ExternalLink,
+  Wind, CloudRain,
 } from 'lucide-react';

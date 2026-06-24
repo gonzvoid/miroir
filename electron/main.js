@@ -4,7 +4,9 @@ import { pathToFileURL } from 'url';
 import path from 'path';
 import fs from 'fs/promises';
 import * as googleAuth from './google-auth.js';
+import electronUpdater from 'electron-updater';
 
+const { autoUpdater } = electronUpdater;
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const isDev = process.env.ELECTRON_DEV === '1';
 
@@ -190,6 +192,26 @@ ipcMain.handle('win:maximize',    () => { if (win?.isMaximized()) win.restore();
 ipcMain.handle('win:close',       () => win?.close());
 ipcMain.handle('win:isMaximized', () => win?.isMaximized() ?? false);
 ipcMain.handle('shell:openExternal', (_e, url) => shell.openExternal(url));
+
+/* ---------------- IPC: auto-update (electron-updater) ---------------- */
+// Manual download flow: we only check automatically; the user confirms the download.
+autoUpdater.autoDownload = false;
+autoUpdater.autoInstallOnAppQuit = true;
+
+const sendUpdate = (payload) => { try { win?.webContents.send('update:status', payload); } catch { /* window gone */ } };
+
+autoUpdater.on('checking-for-update', () => sendUpdate({ type: 'checking' }));
+autoUpdater.on('update-available',     (info) => sendUpdate({ type: 'available', info: { version: info?.version } }));
+autoUpdater.on('update-not-available', () => sendUpdate({ type: 'not-available' }));
+autoUpdater.on('download-progress',    (p)    => sendUpdate({ type: 'progress', percent: Math.round(p?.percent ?? 0) }));
+autoUpdater.on('update-downloaded',    (info) => sendUpdate({ type: 'downloaded', info: { version: info?.version } }));
+autoUpdater.on('error',                (err)  => sendUpdate({ type: 'error', message: String(err?.message || err) }));
+
+ipcMain.handle('app:version', () => app.getVersion());
+// In dev there is no app-update.yml, so checking would throw — guard it.
+ipcMain.handle('update:check',    () => { if (!isDev) autoUpdater.checkForUpdates().catch((e) => sendUpdate({ type: 'error', message: String(e?.message || e) })); });
+ipcMain.handle('update:download', () => autoUpdater.downloadUpdate().catch((e) => sendUpdate({ type: 'error', message: String(e?.message || e) })));
+ipcMain.handle('update:install',  () => autoUpdater.quitAndInstall());
 
 /* ---------------- IPC: image folder ---------------- */
 const IMG_EXT = new Set(['.jpg', '.jpeg', '.png', '.webp', '.gif', '.avif']);

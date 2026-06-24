@@ -128,7 +128,7 @@ export default function Focal({
                     <button onClick={() => cycleTask(t.id)}
                       className="shrink-0 w-5 h-5 rounded-[7px] border-[1.5px] grid place-items-center relative overflow-hidden transition-all"
                       style={{
-                        borderColor: st >= 1 ? tCol : 'var(--tick-empty)',
+                        borderColor: tCol,
                         background: st === 2 ? tCol : 'transparent',
                         color: st === 2 ? 'var(--canvas)' : 'transparent',
                       }}>
@@ -138,8 +138,6 @@ export default function Focal({
                       {st === 2 && <Check size={12} className="relative z-10" />}
                     </button>
 
-                    {/* tag dot */}
-                    <span className="shrink-0 w-1.5 h-1.5 rounded-full" style={{ background: tCol }} title={tagLabel(t.lane)} />
 
                     {editing === t.id ? (
                       <input autoFocus defaultValue={t.title}
@@ -247,7 +245,6 @@ export default function Focal({
                       style={{ borderColor: tCol, background: tCol }}>
                       <Check size={12} className="relative z-10 text-canvas" />
                     </button>
-                    <span className="shrink-0 w-1.5 h-1.5 rounded-full opacity-40" style={{ background: tCol }} />
                     <span className="flex-1 text-sm text-text-3 line-through leading-tight">{t.title}</span>
                     <button onClick={() => delTask(t.id)}
                       className="opacity-0 group-hover:opacity-100 text-text-3 hover:text-[#c0564b] transition-all p-0.5">

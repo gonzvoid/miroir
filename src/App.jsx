@@ -17,11 +17,12 @@ import {
   LAYOUT_PRESETS, TAGS_PRESETS, TILE_CATALOG, parseYmd,
 } from './lib/utils';
 import { GripVertical, X, Plus } from './components/icons';
-import Header, { TopBar } from './components/Header';
+import Header, { TopBar, BottomDock } from './components/Header';
 import Focal from './components/Focal';
 import ImageTile from './components/ImageTile';
 import LayoutEditor from './components/LayoutEditor';
 import SettingsPanel from './components/SettingsPanel';
+import { useUpdater } from './lib/useUpdater';
 import {
   Timeline, DailyLoops, Summary, Countdown, Sources,
   MoodPanel, CalCard, TaskHistory, Doodle, LunchMenu,
@@ -65,7 +66,7 @@ const DEFAULTS = {
   ],
   inspoLinks: [],
   clockFace: 'list',
-  accentColor: 'slate', language: 'en', weekStart: 'mon', _v: 0,
+  accentColor: 'slate', language: 'en', weekStart: 'mon', tileStyle: 'flat', _v: 0,
   projects: [],
   books: { current: null, completed: [] },
   trip: null,
@@ -93,22 +94,20 @@ function SortableTile({ id, unlocked, isAnyDragging, onRemove, children }) {
       }}
       className="relative">
       {unlocked && (
-        <div className="absolute top-0 right-0 z-[19] pointer-events-none"
+        <div className="absolute top-2.5 right-2.5 z-20 flex items-center gap-0.5 p-0.5 rounded-full"
           style={{
-            width: 88, height: 60,
-            background: 'radial-gradient(ellipse at 90% 10%, var(--surface) 0%, transparent 70%)',
-            opacity: 0.88,
-          }} />
-      )}
-      {unlocked && (
-        <div className="absolute top-2.5 right-2.5 z-20 flex items-center gap-1">
+            background: 'color-mix(in srgb, var(--surface) 68%, transparent)',
+            backdropFilter: 'blur(14px) saturate(150%)',
+            WebkitBackdropFilter: 'blur(14px) saturate(150%)',
+            boxShadow: '0 2px 12px -4px rgba(0,0,0,0.18), 0 1px 3px rgba(0,0,0,0.08)',
+          }}>
           <button
             onClick={() => onRemove?.(id)}
-            className="w-8 h-8 grid place-items-center bg-surface-3 rounded-full text-text-3 hover:text-[#c0564b] hover:bg-red-50 shadow-sm transition-colors">
+            className="w-7 h-7 grid place-items-center rounded-full text-text-3 hover:text-[#c0564b] hover:bg-red-50 transition-colors">
             <X size={12} />
           </button>
           <div {...attributes} {...listeners}
-            className="w-8 h-8 grid place-items-center bg-surface-3 rounded-full cursor-grab active:cursor-grabbing text-text-3 hover:text-text shadow-sm transition-colors">
+            className="w-7 h-7 grid place-items-center rounded-full cursor-grab active:cursor-grabbing text-text-3 hover:text-text hover:bg-surface-2 transition-colors">
             <GripVertical size={14} />
           </div>
         </div>
@@ -292,10 +291,12 @@ export default function App() {
   const [showLayoutEditor, setShowLayoutEditor] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
   const [previewOnboarding, setPreviewOnboarding] = useState(false);
+  const updater = useUpdater();
   const composerRef = useRef(null);
   const now = new Date();
 
   useEffect(() => { document.documentElement.setAttribute('data-theme', s.theme); }, [s.theme]);
+  useEffect(() => { document.documentElement.setAttribute('data-tile-style', s.tileStyle ?? 'flat'); }, [s.tileStyle]);
   useEffect(() => {
     document.documentElement.setAttribute('data-accent', s.accentColor ?? 'slate');
   }, [s.accentColor]);
@@ -485,7 +486,7 @@ export default function App() {
     canvas:      <LiveCanvas />,
     sun:         <SunArcTile />,
     moon:        <MoonPhaseTile />,
-    weather:     <WeatherOrbTile />,
+    weather:     <WeatherOrbTile theme={s.theme} tileStyle={s.tileStyle ?? 'flat'} />,
     worldclock:  <WorldClockTile  clocks={s.clocks}     setClocks={(v)    => patch('clocks', v)}  clockFace={s.clockFace}  setClockFace={(v) => patch('clockFace', v)} />,
     inspolinks:  <InspoLinksTile  links={s.inspoLinks}  setLinks={(v)     => patch('inspoLinks', v)} />,
     plants:      <PlantTrackerTile plants={s.plants}    setPlants={(v)    => patch('plants', v)} />,
@@ -619,39 +620,29 @@ export default function App() {
 
       {/* settings panel */}
       {showSettings && (
-        <SettingsPanel s={s} patch={patch} onClose={() => setShowSettings(false)} />
+        <SettingsPanel s={s} patch={patch} updater={updater} onClose={() => setShowSettings(false)} />
       )}
 
-      {/* inner scroll container — sticky bar + tiles scroll together */}
+      {/* scrollable content */}
       <div style={{ height: '100%', overflowY: 'auto' }}>
-        {/* sticky top bar — icons + window controls always visible */}
-        <div className="sticky top-0 z-40 px-[26px] pt-2 pb-8" style={{ pointerEvents: 'none' }}>
-          {/* bar background — frosted glass when bg image is set, solid otherwise */}
-          <div className="absolute inset-x-0 top-0" style={{
-            height: 42,
-            background: s.bg
-              ? 'color-mix(in srgb, var(--canvas) 55%, transparent)'
-              : 'var(--canvas)',
-            backdropFilter:         s.bg ? 'blur(14px) saturate(140%)' : undefined,
-            WebkitBackdropFilter:   s.bg ? 'blur(14px) saturate(140%)' : undefined,
-          }} />
-          {/* gradient fade tail */}
-          <div className="absolute inset-x-0 bottom-0" style={{
-            top: 42,
-            background: 'linear-gradient(to bottom, color-mix(in srgb, var(--canvas) 80%, transparent) 0%, color-mix(in srgb, var(--canvas) 40%, transparent) 45%, color-mix(in srgb, var(--canvas) 8%, transparent) 75%, transparent 100%)',
-          }} />
-          <div className="relative" style={{ pointerEvents: 'auto' }}>
-            <TopBar
-              theme={s.theme} setTheme={(v) => patch('theme', v)}
-              unlocked={unlocked} setUnlocked={setUnlocked}
-              onOpenLayoutEditor={() => setShowLayoutEditor(true)}
-              onOpenSettings={() => setShowSettings(true)}
-            />
+        {/* thin sticky top strip — drag area + window controls only */}
+        <div className="sticky top-0 z-40" style={{
+          paddingBottom: 64,
+          background: s.bg
+            ? 'color-mix(in srgb, var(--canvas) 38%, transparent)'
+            : 'color-mix(in srgb, var(--canvas) 90%, transparent)',
+          backdropFilter: s.bg ? 'blur(14px)' : undefined,
+          WebkitBackdropFilter: s.bg ? 'blur(14px)' : undefined,
+          WebkitMaskImage: 'linear-gradient(to bottom, black 0, black 32px, rgba(0,0,0,0.97) 38px, rgba(0,0,0,0.90) 44px, rgba(0,0,0,0.78) 51px, rgba(0,0,0,0.65) 57px, rgba(0,0,0,0.50) 63px, rgba(0,0,0,0.35) 69px, rgba(0,0,0,0.22) 75px, rgba(0,0,0,0.10) 82px, rgba(0,0,0,0.03) 88px, transparent 94px)',
+          maskImage: 'linear-gradient(to bottom, black 0, black 32px, rgba(0,0,0,0.97) 38px, rgba(0,0,0,0.90) 44px, rgba(0,0,0,0.78) 51px, rgba(0,0,0,0.65) 57px, rgba(0,0,0,0.50) 63px, rgba(0,0,0,0.35) 69px, rgba(0,0,0,0.22) 75px, rgba(0,0,0,0.10) 82px, rgba(0,0,0,0.03) 88px, transparent 94px)',
+          pointerEvents: 'none',
+        }}>
+          <div style={{ pointerEvents: 'auto' }}>
+            <TopBar />
           </div>
         </div>
 
-        {/* scrollable content */}
-        <div className="px-[26px] pb-7">
+        <div className="px-[26px] pb-24">
           <Header
             theme={s.theme} setTheme={(v) => patch('theme', v)}
             filter={filter} setFilter={setFilter}
@@ -675,16 +666,46 @@ export default function App() {
 
             <DragOverlay dropAnimation={{ duration: 150, easing: 'ease' }}>
               {activeId && (
-                <div className="rounded-card bg-surface shadow-lg opacity-80 p-[22px] border border-stroke"
-                  style={{ transform: 'rotate(0.8deg) scale(1.015)' }}>
-                  <div className="text-[13px] font-medium text-text-2">{tileLabels[activeId] ?? activeId}</div>
-                  <div className="mt-2 h-8 bg-surface-2 rounded-xl" />
-                  <div className="mt-1.5 h-4 bg-surface-2 rounded-xl w-2/3" />
+                <div className="rounded-card overflow-hidden border border-stroke"
+                  style={{
+                    transform: 'rotate(0.8deg) scale(1.015)',
+                    background: 'var(--surface)',
+                    boxShadow: '0 8px 32px -8px rgba(0,0,0,0.18), 0 2px 8px rgba(0,0,0,0.06)',
+                    padding: '18px 22px',
+                    minWidth: 120,
+                  }}>
+                  <div className="text-[12px] text-text-3">{tileLabels[activeId] ?? activeId}</div>
                 </div>
               )}
             </DragOverlay>
           </DndContext>
         </div>
+      </div>
+
+      {/* bottom blur vignette */}
+      <div style={{
+        position: 'absolute', bottom: 0, left: 0, right: 0,
+        height: 110,
+        background: s.bg
+          ? 'color-mix(in srgb, var(--canvas) 38%, transparent)'
+          : 'color-mix(in srgb, var(--canvas) 90%, transparent)',
+        backdropFilter: s.bg ? 'blur(14px)' : undefined,
+        WebkitBackdropFilter: s.bg ? 'blur(14px)' : undefined,
+        WebkitMaskImage: 'linear-gradient(to top, black 0, black 32px, rgba(0,0,0,0.97) 38px, rgba(0,0,0,0.90) 44px, rgba(0,0,0,0.78) 51px, rgba(0,0,0,0.65) 57px, rgba(0,0,0,0.50) 63px, rgba(0,0,0,0.35) 69px, rgba(0,0,0,0.22) 75px, rgba(0,0,0,0.10) 82px, rgba(0,0,0,0.03) 88px, transparent 100px)',
+        maskImage: 'linear-gradient(to top, black 0, black 32px, rgba(0,0,0,0.97) 38px, rgba(0,0,0,0.90) 44px, rgba(0,0,0,0.78) 51px, rgba(0,0,0,0.65) 57px, rgba(0,0,0,0.50) 63px, rgba(0,0,0,0.35) 69px, rgba(0,0,0,0.22) 75px, rgba(0,0,0,0.10) 82px, rgba(0,0,0,0.03) 88px, transparent 100px)',
+        zIndex: 39,
+        pointerEvents: 'none',
+      }} />
+      {/* bottom dock */}
+      <div style={{ position: 'absolute', bottom: 14, left: '50%', transform: 'translateX(-50%)', zIndex: 40 }}>
+        <BottomDock
+          theme={s.theme} setTheme={(v) => patch('theme', v)}
+          unlocked={unlocked} setUnlocked={setUnlocked}
+          onOpenLayoutEditor={() => setShowLayoutEditor(true)}
+          onOpenSettings={() => setShowSettings(true)}
+          hasBg={!!s.bg}
+          updateReady={updater.status === 'available' || updater.status === 'downloaded'}
+        />
       </div>
     </div>
   );

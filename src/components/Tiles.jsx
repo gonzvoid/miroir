@@ -6,6 +6,7 @@ import {
 import {
   Plus, Check, X, ChevronLeft, ChevronRight, Trash2, ArrowRight, Link2,
   CheckSquare, CalIcon, Globe, Clock, Droplets, ExternalLink, Settings,
+  Wind, CloudRain, Sun,
 } from './icons';
 
 const Card = ({ children, className = '' }) => (
@@ -480,6 +481,32 @@ export function Sources({ calendars, setCalendars, googleAccounts, onConnect, on
 
 const DAY_ABBR = ['Su', 'Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa'];
 
+/* Day orb — soft animated blend of the three logged segment moods */
+function DayOrb({ dm, size = 92 }) {
+  const segColor = (id) => (dm[id]?.level ? moodColor(dm[id].level) : 'var(--surface-2)');
+  const cM = segColor('morning');
+  const cD = segColor('midday');
+  const cE = segColor('evening');
+  const anyLogged = dm.morning?.level || dm.midday?.level || dm.evening?.level;
+  const blob = (color, top, left, anim) => ({
+    position: 'absolute', width: '78%', height: '78%', borderRadius: '50%',
+    top, left, background: color, filter: 'blur(11px)',
+    animation: `${anim} ease-in-out infinite`,
+  });
+  return (
+    <div className="shrink-0 grid place-items-center" style={{ width: size, height: size }}>
+      <div style={{
+        width: size, height: size, borderRadius: '50%', position: 'relative', overflow: 'hidden',
+        background: 'var(--surface-2)', opacity: anyLogged ? 1 : 0.5, transition: 'opacity 0.2s ease',
+      }}>
+        <div style={blob(cM, '-6%', '-8%', 'orb-a 9s')} />
+        <div style={blob(cD, '4%', '34%', 'orb-b 11s')} />
+        <div style={blob(cE, '32%', '6%', 'orb-c 13s')} />
+      </div>
+    </div>
+  );
+}
+
 /* ---------------- Mood panel (logger + 30-day heatmap) ---------------- */
 export function MoodPanel({ selDay, shiftDay, setSelDay, moods, setMoodSeg, now }) {
   const d = parseYmd(selDay); const isToday = sameDay(d, new Date());
@@ -509,30 +536,37 @@ export function MoodPanel({ selDay, shiftDay, setSelDay, moods, setMoodSeg, now 
           <button onClick={() => shiftDay(1)} disabled={isToday} className="w-6 h-6 grid place-items-center text-text-2 hover:text-text hover:bg-surface-2 rounded-full disabled:opacity-30 disabled:cursor-default"><ChevronRight size={13} /></button>
         </div>
       </div>
-      {SEGMENTS.map((seg) => {
-        const cur = dm[seg.id] || {};
-        return (
-          <div key={seg.id} className="flex items-center gap-2.5 py-[5px]">
-            <span className="text-[12.5px] text-text-2 w-[58px] shrink-0">{seg.label}</span>
-            <div className="flex gap-1.5 flex-1">
-              {MOODS.map((m) => (
-                <button key={m.id} title={m.label} onClick={() => setMoodSeg(selDay, seg.id, { level: cur.level === m.id ? null : m.id })}
-                  className={`w-[22px] h-[22px] rounded-[7px] border-2 transition-transform hover:scale-110 ${cur.level === m.id ? 'border-text' : 'border-transparent'}`}
-                  style={{ background: m.color }} />
-              ))}
-            </div>
-          </div>
-        );
-      })}
+      <div className="flex items-center gap-4">
+        <div className="flex-1 min-w-0">
+          {SEGMENTS.map((seg) => {
+            const cur = dm[seg.id] || {};
+            return (
+              <div key={seg.id} className="flex items-center gap-2.5 py-[5px]">
+                <span className="text-[12.5px] text-text-2 w-[58px] shrink-0">{seg.label}</span>
+                <div className="flex gap-1.5">
+                  {MOODS.map((m) => (
+                    <button key={m.id} title={m.label} onClick={() => setMoodSeg(selDay, seg.id, { level: cur.level === m.id ? null : m.id })}
+                      className={`w-[22px] h-[22px] rounded-[7px] border-2 transition-transform hover:scale-110 ${cur.level === m.id ? 'border-text' : 'border-transparent'}`}
+                      style={{ background: m.color }} />
+                  ))}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+        <DayOrb dm={dm} />
+      </div>
 
       <div className="mt-4 pt-3.5 border-t border-stroke">
         <div className="flex justify-between items-center mb-2.5">
-          <span className="text-[12px] font-medium">{moodView === 'month' ? 'Last 30 days' : 'This week'}</span>
+          {moodView === 'month'
+            ? <span className="text-[12px] font-medium">Last 30 days</span>
+            : <span />}
           <div className="flex bg-surface-2 rounded-full p-0.5">
-            {['month', 'week'].map((v) => (
+            {[['month','30d'], ['week','7d']].map(([v, label]) => (
               <button key={v} onClick={() => setMoodView(v)}
                 className={`text-[10.5px] px-2.5 py-[3px] rounded-full ${moodView === v ? 'bg-surface text-text font-medium shadow-sm' : 'text-text-3'}`}>
-                {v === 'month' ? '30d' : '7d'}
+                {label}
               </button>
             ))}
           </div>
@@ -1186,7 +1220,7 @@ export function Doodle({ doodles, setDoodles, now }) {
    Focus Timer (Pomodoro) — slot-drum redesign
 ───────────────────────────────────────────────────────────── */
 
-const FD = { H: 116, FS: 100 };
+const FD = { H: 70, FS: 58 };
 
 function FocusResetIcon({ size = 16 }) {
   return (
@@ -1243,14 +1277,14 @@ function FlipDigit({ value }) {
 
   return (
     <div style={{
-      height: FD.H,
+      height: FD.H + 100, padding: '0 28px', margin: '-50px -28px',
       display: 'flex', alignItems: 'center', justifyContent: 'center',
-      flexShrink: 0, userSelect: 'none',
-      maskImage: 'linear-gradient(to bottom, transparent 0%, black 20%, black 80%, transparent 100%)',
-      WebkitMaskImage: 'linear-gradient(to bottom, transparent 0%, black 20%, black 80%, transparent 100%)',
+      flexShrink: 0, userSelect: 'none', pointerEvents: 'none',
+      maskImage: 'linear-gradient(to bottom, transparent 0%, black 30%, black 70%, transparent 100%)',
+      WebkitMaskImage: 'linear-gradient(to bottom, transparent 0%, black 30%, black 70%, transparent 100%)',
     }}>
       <span style={{
-        fontSize: FD.FS, fontWeight: 900,
+        fontSize: FD.FS, fontWeight: 600,
         color: 'var(--text)',
         fontVariantNumeric: 'tabular-nums',
         fontFeatureSettings: '"tnum"',
@@ -1263,6 +1297,90 @@ function FlipDigit({ value }) {
         {shown}
       </span>
     </div>
+  );
+}
+
+/* wave helper — three overlapping sines, bigger amplitudes for organic feel */
+function waveAt(x, W, t) {
+  const n = x / W;
+  return (
+    Math.sin(n * Math.PI * 3.8 + t        ) * 14 +
+    Math.sin(n * Math.PI * 7.1 + t * 1.55 ) * 6  +
+    Math.sin(n * Math.PI * 2.3 + t * 0.75 ) * 10
+  );
+}
+
+function FillCanvas({ fillPct, running, totalSecs }) {
+  const canvasRef  = useRef(null);
+  const rafRef     = useRef(null);
+  const phaseRef   = useRef(0);
+  const displayRef = useRef(fillPct);   // smoothly interpolated fill %
+  const lastTsRef  = useRef(null);
+  const fillRef    = useRef(fillPct);
+  const runRef     = useRef(running);
+  const totalRef   = useRef(totalSecs);
+
+  useEffect(() => {
+    fillRef.current = fillPct;
+    if (fillPct === 0) displayRef.current = 0;
+  }, [fillPct]);
+  useEffect(() => { runRef.current   = running;   }, [running]);
+  useEffect(() => { totalRef.current = totalSecs; }, [totalSecs]);
+
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+
+    const draw = (ts) => {
+      rafRef.current = requestAnimationFrame(draw);
+      if (document.hidden) return;
+
+      const dt = lastTsRef.current !== null ? ts - lastTsRef.current : 0;
+      lastTsRef.current = ts;
+
+      // Advance display at real rate — no more 1-second jumps
+      const stepPct = totalRef.current > 0 ? 100 / totalRef.current : 0; // % per second
+      if (runRef.current && dt > 0) displayRef.current += stepPct * dt / 1000;
+      // Clamp: max 1 step ahead of timer (drift guard); snap down on reset/skip
+      displayRef.current = Math.max(0, Math.min(fillRef.current + stepPct, displayRef.current));
+
+      const W  = canvas.width;
+      const H  = canvas.height;
+      const fp = displayRef.current;
+
+      ctx.clearRect(0, 0, W, H);
+      if (fp < 0.3) return;
+
+      if (runRef.current) phaseRef.current += 0.008;
+
+      const baseY = H * (1 - fp / 100);
+
+      ctx.beginPath();
+      ctx.moveTo(0, H);
+      ctx.lineTo(0, baseY + waveAt(0, W, phaseRef.current));
+      for (let x = 1; x <= W; x++) {
+        ctx.lineTo(x, baseY + waveAt(x, W, phaseRef.current));
+      }
+      ctx.lineTo(W, H);
+      ctx.closePath();
+
+      const grad = ctx.createLinearGradient(0, H, 0, Math.max(0, baseY - 20));
+      grad.addColorStop(0,   '#C43800');
+      grad.addColorStop(0.4, '#E85A10');
+      grad.addColorStop(0.8, '#F58020');
+      grad.addColorStop(1,   '#FFA840');
+      ctx.fillStyle = grad;
+      ctx.fill();
+    };
+
+    rafRef.current = requestAnimationFrame(draw);
+    return () => { if (rafRef.current) cancelAnimationFrame(rafRef.current); };
+  }, []);
+
+  return (
+    <canvas ref={canvasRef} width={240} height={240}
+      style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', filter: 'blur(8px)' }} />
   );
 }
 
@@ -1309,20 +1427,19 @@ export function FocusTile({ pomodoroLog = [], onLogSession }) {
 
   const mm = String(Math.floor(secsLeft / 60)).padStart(2, '0');
   const ss = String(secsLeft % 60).padStart(2, '0');
-  const today = ymd(new Date());
-  const todaySessions = pomodoroLog.filter((l) => l.date === today).length;
+  const isAtStart = secsLeft === totalSecs && !running;
+  const fillPct   = totalSecs > 0 ? (1 - secsLeft / totalSecs) * 100 : 0;
+  const iconColor = fillPct > 44 ? '#fff' : 'var(--accent)';
 
-  return (
-    <Card>
-      <Head title="Focus" right={
-        <button onClick={() => setShowSettings((s) => !s)}
-          className="text-[11px] text-text-3 hover:text-text transition-colors">
-          {showSettings ? 'Done' : 'Settings'}
-        </button>
-      } />
-
-      {showSettings ? (
-        <div className="flex flex-col gap-4 py-2">
+  if (showSettings) {
+    return (
+      <Card>
+        <div className="flex justify-between items-center mb-4">
+          <div className="text-[15px] font-semibold tracking-tight">Settings</div>
+          <button onClick={() => setShowSettings(false)}
+            className="text-[11px] text-text-3 hover:text-text transition-colors">Done</button>
+        </div>
+        <div className="flex flex-col gap-4 py-1">
           {[
             ['Work', workMins, changeWork, 5, 90, 5],
             ['Break', breakMins, changeBreak, 1, 30, 1],
@@ -1339,51 +1456,67 @@ export function FocusTile({ pomodoroLog = [], onLogSession }) {
             </div>
           ))}
         </div>
-      ) : (
-        <>
-          {/* digit display */}
-          <div className="flex items-center justify-center mb-5">
-            <FlipDigit value={mm[0]} />
-            <FlipDigit value={mm[1]} />
-            <div className="flex flex-col mx-3" style={{ gap: 11, alignSelf: 'center' }}>
-              <div style={{ width: 6, height: 6, borderRadius: '50%', background: 'var(--text-3)' }} />
-              <div style={{ width: 6, height: 6, borderRadius: '50%', background: 'var(--text-3)' }} />
-            </div>
-            <FlipDigit value={ss[0]} />
-            <FlipDigit value={ss[1]} />
-          </div>
+      </Card>
+    );
+  }
 
-          {/* controls */}
-          <div className="flex items-center justify-center gap-3 mb-4">
+  return (
+    <div className="flex gap-3">
+
+      {/* ── Left card (65%) — label + settings + digits + controls ── */}
+      <section className="rounded-card bg-surface shadow-sm flex flex-col"
+        style={{ flex: '0 0 calc(65% - 6px)', padding: '14px 18px 16px' }}>
+        <div className="flex items-center justify-between">
+          <span className="text-[15px] font-semibold tracking-tight">
+            {mode === 'work' ? 'Focus' : 'Break'}
+          </span>
+          <button onClick={() => setShowSettings(true)}
+            className="text-[11px] text-text-3 hover:text-text transition-colors">
+            Settings
+          </button>
+        </div>
+
+        <div className="flex items-center mt-0.5">
+          <FlipDigit value={mm[0]} />
+          <FlipDigit value={mm[1]} />
+          <div className="flex flex-col" style={{ gap: 6, alignSelf: 'center', margin: '0 2px' }}>
+            <div style={{ width: 4, height: 4, borderRadius: '50%', background: 'var(--text-3)' }} />
+            <div style={{ width: 4, height: 4, borderRadius: '50%', background: 'var(--text-3)' }} />
+          </div>
+          <FlipDigit value={ss[0]} />
+          <FlipDigit value={ss[1]} />
+        </div>
+
+        <div className="flex items-center gap-2 mt-2 relative z-10">
+          {!isAtStart && (
             <button onClick={reset}
-              className="w-9 h-9 rounded-full border border-stroke text-text-3 hover:text-text grid place-items-center transition-colors">
-              <FocusResetIcon size={15} />
+              className="text-[11px] px-3 py-1 rounded-full border border-stroke text-text-2 hover:text-text transition-colors">
+              Reset
             </button>
-            <button onClick={toggle}
-              className="w-12 h-12 rounded-full bg-text text-canvas grid place-items-center hover:opacity-80 transition-opacity">
-              {running ? <FocusPauseIcon size={16} /> : <FocusPlayIcon size={16} />}
-            </button>
-            <button onClick={skip}
-              className="w-9 h-9 rounded-full border border-stroke text-text-3 hover:text-text grid place-items-center transition-colors">
-              <FocusSkipIcon size={15} />
-            </button>
-          </div>
+          )}
+          <button onClick={skip}
+            className="text-[11px] px-3 py-1 rounded-full border border-stroke text-text-2 hover:text-text transition-colors">
+            Skip
+          </button>
+        </div>
+      </section>
 
-          {/* session dots */}
-          <div className="flex items-center justify-center gap-1.5">
-            {Array.from({ length: Math.max(4, todaySessions + 1) }, (_, i) => (
-              <div key={i} className="w-1.5 h-1.5 rounded-full"
-                style={{ background: i < todaySessions ? 'var(--accent)' : 'var(--stroke)' }} />
-            ))}
-            {todaySessions > 0 && (
-              <span className="text-[11px] text-text-3 ml-1">
-                {todaySessions} session{todaySessions !== 1 ? 's' : ''} today
-              </span>
-            )}
-          </div>
-        </>
-      )}
-    </Card>
+      {/* ── Right card — play/pause with liquid fill ── */}
+      <button onClick={toggle}
+        className="flex-1 shadow-sm grid place-items-center active:scale-[0.97] transition-transform relative overflow-hidden"
+        style={{
+          borderRadius: 20,
+          background: 'var(--accent-tint)',
+          color: iconColor,
+          transition: 'color 0.4s ease, transform 0.12s cubic-bezier(0.2, 0, 0, 1)',
+        }}>
+        <FillCanvas fillPct={fillPct} running={running} totalSecs={totalSecs} />
+        <span style={{ position: 'relative', zIndex: 1 }}>
+          {running ? <FocusPauseIcon size={30} /> : <FocusPlayIcon size={26} />}
+        </span>
+      </button>
+
+    </div>
   );
 }
 
@@ -1906,7 +2039,6 @@ function OrbFace({ clock, size = 260 }) {
           <feBlend in="SourceGraphic" in2="masked" mode="overlay" />
         </filter>
       </defs>
-      <rect width={size} height={size} fill="var(--surface)" />
       {/* Orb */}
       <circle cx={cx} cy={cy} r={r * 0.72} fill={`url(#og-${uid})`} filter={`url(#on-${uid})`} />
       {/* Hour hand */}
@@ -1936,6 +2068,7 @@ export function WorldClockTile({ clocks, setClocks, clockFace = 'list', setClock
   const [adding, setAdding] = useState(false);
   const [selTz, setSelTz] = useState(COMMON_TZS[0][0]);
   const [activeIdx, setActiveIdx] = useState(0);
+  const [orbSplit, setOrbSplit] = useState(false);
 
   useEffect(() => {
     const id = setInterval(() => setTick((t) => t + 1), 1000);
@@ -1943,6 +2076,7 @@ export function WorldClockTile({ clocks, setClocks, clockFace = 'list', setClock
   }, []);
 
   const addClock = () => {
+    if (clocks.length >= 5) return;
     if (clocks.some((c) => c.tz === selTz)) return;
     const label = COMMON_TZS.find(([tz]) => tz === selTz)?.[1] ?? selTz;
     setClocks([...clocks, { id: `c${Date.now()}`, city: label, tz: selTz }]);
@@ -1985,7 +2119,7 @@ export function WorldClockTile({ clocks, setClocks, clockFace = 'list', setClock
               <AnalogFace clock={activeClock} size={200} />
             </div>
             <div className="text-center">
-              <div className="text-[14px] font-medium text-text">{activeClock?.city}</div>
+              <div className="text-[15px] font-semibold tracking-tight text-text">{activeClock?.city}</div>
               <div className="text-[11px] text-text-3">{formatOffset(activeClock?.tz)}</div>
               {clocks.length > 1 && (
                 <div className="text-[10px] text-text-3 mt-0.5 opacity-60">tap to cycle</div>
@@ -1998,9 +2132,63 @@ export function WorldClockTile({ clocks, setClocks, clockFace = 'list', setClock
   }
 
   if (clockFace === 'orb') {
+    const otherClocks = clocks.filter((_, i) => i !== activeIdx % Math.max(1, clocks.length));
+
+    if (orbSplit && clocks.length > 1) {
+      return (
+        <div className="flex gap-3">
+          {/* Left bento — orb */}
+          <section className="bg-surface rounded-card shadow-sm relative overflow-hidden flex-[7]">
+            <div className="absolute top-[16px] left-[18px] z-10 pointer-events-none">
+              <div className="text-[15px] font-semibold tracking-tight text-text leading-tight">{activeClock?.city}</div>
+              <div className="text-[11px] text-text-2 mt-1">{formatTime(activeClock?.tz)}</div>
+            </div>
+            <div className="flex flex-col items-center" onClick={cycleCity}
+              style={{ cursor: clocks.length > 1 ? 'pointer' : 'default' }}>
+              <OrbFace clock={activeClock} size={190} />
+            </div>
+            <button onClick={() => setOrbSplit(false)}
+              className="absolute bottom-[14px] left-[14px] z-10 w-7 h-7 flex items-center justify-center bg-surface-2 rounded-full text-text-3 hover:text-text transition-colors">
+              <svg width="13" height="10" viewBox="0 0 14 11" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round">
+                <rect x="0.7" y="0.7" width="12.6" height="9.6" rx="1.5"/>
+              </svg>
+            </button>
+            <div className="absolute bottom-[14px] right-[14px] z-10 flex items-center gap-2">
+              {faceToggle}
+            </div>
+          </section>
+
+          {/* Right bento — other clocks, text only */}
+          <section className="bg-surface rounded-card shadow-sm flex-[3] flex flex-col justify-evenly py-5 px-3">
+            {otherClocks.map((c) => (
+              <div key={c.id}>
+                <div className="text-[12px] font-medium text-text leading-tight truncate">{c.city}</div>
+                <div className="text-[11px] text-text-2 tabular-nums mt-0.5">{formatTime(c.tz)}</div>
+              </div>
+            ))}
+          </section>
+        </div>
+      );
+    }
+
     return (
-      <section className="rounded-card shadow-sm relative overflow-hidden" style={{ background: 'var(--surface)' }}>
-        <div className="absolute top-[14px] right-[14px] z-10 flex items-center gap-2">
+      <section className="bg-surface rounded-card shadow-sm relative overflow-hidden">
+        {clocks.length > 0 && (
+          <div className="absolute top-[16px] left-[18px] z-10 pointer-events-none">
+            <div className="text-[15px] font-semibold tracking-tight text-text leading-tight">{activeClock?.city}</div>
+            <div className="text-[11px] text-text-2 mt-1">{formatTime(activeClock?.tz)}</div>
+          </div>
+        )}
+        {clocks.length > 1 && (
+          <button onClick={() => setOrbSplit(true)}
+            className="absolute bottom-[14px] left-[14px] z-10 w-7 h-7 flex items-center justify-center bg-surface-2 rounded-full text-text-3 hover:text-text transition-colors">
+            <svg width="13" height="10" viewBox="0 0 14 11" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round">
+              <rect x="0.7" y="0.7" width="8.5" height="9.6" rx="1.5"/>
+              <rect x="10.8" y="0.7" width="2.5" height="9.6" rx="1"/>
+            </svg>
+          </button>
+        )}
+        <div className="absolute bottom-[14px] right-[14px] z-10 flex items-center gap-2">
           {faceToggle}
         </div>
         {clocks.length === 0 ? (
@@ -2009,10 +2197,6 @@ export function WorldClockTile({ clocks, setClocks, clockFace = 'list', setClock
           <div className="flex flex-col items-center" onClick={cycleCity}
             style={{ cursor: clocks.length > 1 ? 'pointer' : 'default' }}>
             <OrbFace clock={activeClock} size={260} />
-            <div className="absolute bottom-4 left-0 right-0 text-center pointer-events-none">
-              <div className="text-[13px] font-medium text-text-2">{activeClock?.city}</div>
-              <div className="text-[11px] text-text-3">{formatTime(activeClock?.tz)}</div>
-            </div>
           </div>
         )}
       </section>
@@ -2027,11 +2211,13 @@ export function WorldClockTile({ clocks, setClocks, clockFace = 'list', setClock
         right={
           <div className="flex items-center gap-2">
             {faceToggle}
-            <button onClick={() => setAdding((v) => !v)}
-              className="w-7 h-7 rounded-full bg-surface-2 border border-stroke flex items-center justify-center
-                text-text-3 hover:text-text transition-colors">
-              <Plus size={12} />
-            </button>
+            {clocks.length < 5 && (
+              <button onClick={() => setAdding((v) => !v)}
+                className="w-7 h-7 rounded-full bg-surface-2 border border-stroke flex items-center justify-center
+                  text-text-3 hover:text-text transition-colors">
+                <Plus size={12} />
+              </button>
+            )}
           </div>
         }
       />
@@ -2745,17 +2931,6 @@ export function MoonPhaseTile() {
    Stops are interpolated independently between anchors.
    Uses OpenMeteo (free, no key) + navigator.geolocation
 ───────────────────────────────────────────────────────────── */
-const _h2r = (h) => { const v = parseInt(h.slice(1), 16); return [(v >> 16) & 255, (v >> 8) & 255, v & 255]; };
-
-// Palettes from the BLUR gradient tool — Peach for warm, Ocean for cold
-// s[0..4] = blob colors (mixed placements); s[5] = tile background base
-const WX_WARM = ['#ee9e81', '#FF6B35', '#ec9db1', '#FFBE0B', '#f39468', '#fce8d5']; // Peach — warm cream base
-const WX_COLD = ['#03045E', '#0077B6', '#00B4D8', '#48CAE4', '#90E0EF', '#caf0f8']; // Ocean
-
-function wxMultiStops(temp) {
-  return temp >= 18 ? WX_WARM : WX_COLD;
-}
-
 function wxCondLabel(code) {
   if (code === 0)  return 'Clear';
   if (code <= 1)   return 'Mostly Clear';
@@ -2772,19 +2947,11 @@ function wxCondLabel(code) {
   return 'Thunderstorm';
 }
 
-const WX_GRAIN = `url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.72' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E")`;
-
-// Seeded PRNG — xorshift32, seed is the current date (YYYYMMDD)
-function seededRng(seed) {
-  let s = (seed ^ 0xdeadbeef) >>> 0 || 1;
-  return () => { s ^= s << 13; s ^= s >>> 17; s ^= s << 5; return (s >>> 0) / 4294967296; };
-}
-
-export function WeatherOrbTile({ lat = 40.4168, lon = -3.7038 }) {
+export function WeatherOrbTile({ lat = 40.4168, lon = -3.7038, theme = 'light', tileStyle = 'flat' }) {
   const [wx, setWx]         = useState(null);
+  const [hourly, setHourly] = useState(null);
   const [coords, setCoords] = useState({ lat, lon });
   const [city, setCity]     = useState('');
-  const [split, setSplit]   = useState(false);
 
   useEffect(() => {
     navigator.geolocation?.getCurrentPosition(
@@ -2793,7 +2960,6 @@ export function WeatherOrbTile({ lat = 40.4168, lon = -3.7038 }) {
     );
   }, []);
 
-  // Reverse geocode to city name via Nominatim
   useEffect(() => {
     let alive = true;
     fetch(`https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${coords.lat}&lon=${coords.lon}&zoom=10`, {
@@ -2802,7 +2968,7 @@ export function WeatherOrbTile({ lat = 40.4168, lon = -3.7038 }) {
       .then((r) => r.json())
       .then((d) => {
         const place   = d.address?.city || d.address?.town || d.address?.village || d.name || '';
-        const country = d.address?.country || '';
+        const country = d.address?.country_code?.toUpperCase() || '';
         if (alive) setCity(place && country ? `${place}, ${country}` : place || country);
       })
       .catch(() => {});
@@ -2813,9 +2979,9 @@ export function WeatherOrbTile({ lat = 40.4168, lon = -3.7038 }) {
     let alive = true;
     const load = async () => {
       try {
-        const url  = `https://api.open-meteo.com/v1/forecast?latitude=${coords.lat}&longitude=${coords.lon}&current=temperature_2m,weathercode,is_day,relative_humidity_2m&temperature_unit=celsius&timezone=auto`;
+        const url  = `https://api.open-meteo.com/v1/forecast?latitude=${coords.lat}&longitude=${coords.lon}&current=temperature_2m,weathercode,is_day,relative_humidity_2m,windspeed_10m&hourly=uv_index,precipitation_probability&temperature_unit=celsius&timezone=auto&forecast_days=1`;
         const data = await fetch(url).then((r) => r.json());
-        if (alive) setWx(data.current);
+        if (alive) { setWx(data.current); setHourly(data.hourly); }
       } catch { /* silent */ }
     };
     load();
@@ -2823,163 +2989,75 @@ export function WeatherOrbTile({ lat = 40.4168, lon = -3.7038 }) {
     return () => { alive = false; clearInterval(id); };
   }, [coords.lat, coords.lon]);
 
-  const rawTemp  = wx?.temperature_2m ?? null;
-  const humidity = wx?.relative_humidity_2m ?? null;
-  const code     = wx?.weathercode ?? 0;
-  const isDay    = wx ? wx.is_day === 1 : new Date().getHours() >= 6 && new Date().getHours() < 20;
-
-  const fmtDeg = (v, pos, neg) => `${Math.abs(v).toFixed(2)}° ${v >= 0 ? pos : neg}`;
-  const coordsStr = `${fmtDeg(coords.lat, 'N', 'S')}  ${fmtDeg(coords.lon, 'E', 'W')}`;
-
-  // 6 palette stops from temperature
-  const stops = wxMultiStops(rawTemp ?? 20);
-
-  // Daily seed: stable within a day, changes at midnight
-  const now  = new Date();
-  const seed = now.getFullYear() * 10000 + (now.getMonth() + 1) * 100 + now.getDate();
-  const rng  = seededRng(seed);
-
-  // Pure CSS multi-radial gradient — same technique as OrbFace, no DOM blobs needed.
-  // High-opacity stops at centre (0.94) drop to transparent by 58%, giving saturated
-  // colour contrast instead of the washed-out average produced by 130% blurred divs.
-  const rgba = (hex, a) => { const [r,g,b] = _h2r(hex); return `rgba(${r},${g},${b},${a})`; };
-
-  const b1 = [48 + rng() * 44, 52 + rng() * 42];
-  const b2 = [5  + rng() * 38, 46 + rng() * 46];
-  const b3 = [52 + rng() * 42, 5  + rng() * 40];
-  const b4 = [5  + rng() * 52, 5  + rng() * 48];
-
-  const tileBackground = [
-    `radial-gradient(ellipse 88% 82% at ${b1[0].toFixed(1)}% ${b1[1].toFixed(1)}%, ${rgba(stops[1], 0.94)} 0%, ${rgba(stops[1], 0.60)} 28%, transparent 58%)`,
-    `radial-gradient(ellipse 76% 72% at ${b2[0].toFixed(1)}% ${b2[1].toFixed(1)}%, ${rgba(stops[3], 0.90)} 0%, ${rgba(stops[3], 0.44)} 30%, transparent 56%)`,
-    `radial-gradient(ellipse 66% 66% at ${b3[0].toFixed(1)}% ${b3[1].toFixed(1)}%, ${rgba(stops[2], 0.86)} 0%, ${rgba(stops[2], 0.32)} 34%, transparent 55%)`,
-    `radial-gradient(ellipse 58% 58% at ${b4[0].toFixed(1)}% ${b4[1].toFixed(1)}%, ${rgba(stops[0], 0.80)} 0%, ${rgba(stops[0], 0.18)} 36%, transparent 52%)`,
-    stops[5],
-  ].join(', ');
+  const now        = new Date();
+  const currentH   = now.getHours();
+  const rawTemp    = wx?.temperature_2m ?? null;
+  const humidity   = wx?.relative_humidity_2m ?? null;
+  const windSpeed  = wx?.windspeed_10m ?? null;
+  const code       = wx?.weathercode ?? 0;
+  const uvRaw      = hourly?.uv_index?.[currentH] ?? null;
+  const uvIndex    = uvRaw !== null ? Math.round(uvRaw) : null;
+  const precipProb = hourly?.precipitation_probability?.[currentH] ?? null;
 
   const tempStr = rawTemp !== null ? `${Math.round(rawTemp)}°` : '–';
-  const ink     = (a) => `rgba(55,22,10,${a})`;
+  const timeStr = now.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: false });
 
-  // Sun arc data (used in split view)
-  const { rise, set } = calcSunTimes(coords.lat, coords.lon);
-  const nowH    = now.getHours() + now.getMinutes() / 60;
-  const sunT    = Math.max(0, Math.min(1, (nowH - rise) / (set - rise)));
-  const isSunUp = nowH >= rise && nowH <= set;
-  // Vertical arc: rises from bottom, peaks right at noon, reaches top at sunset
-  const acx = 22, acy = 65, aR = 50;
-  const sx = acx + aR * Math.sin(Math.PI * sunT);
-  const sy = acy + aR * Math.cos(Math.PI * sunT);
-  const daylightH   = Math.floor(set - rise);
-  const daylightMin = Math.round(((set - rise) % 1) * 60);
+  const uvLabel = (uv) => {
+    if (uv === null) return '–';
+    if (uv <= 2)  return `${uv}  Low`;
+    if (uv <= 5)  return `${uv}  Moderate`;
+    if (uv <= 7)  return `${uv}  High`;
+    if (uv <= 10) return `${uv}  Very High`;
+    return `${uv}  Extreme`;
+  };
 
-  const grain = (
-    <div className="absolute inset-0 pointer-events-none" style={{
-      opacity: 0.18, backgroundImage: WX_GRAIN, backgroundSize: '256px 256px', mixBlendMode: 'overlay',
-    }} />
-  );
+  const isDark   = theme === 'dark';
+  const isGlass  = tileStyle === 'glass';
+  const subCard  = isDark ? 'rgba(0,0,0,0.20)' : 'rgba(0,0,0,0.055)';
+  const c1      = isDark ? 'rgba(236,237,233,0.92)' : 'rgba(18,18,16,0.88)';
+  const c2      = isDark ? 'rgba(236,237,233,0.52)' : 'rgba(18,18,16,0.50)';
+  const c3      = isDark ? 'rgba(236,237,233,0.34)' : 'rgba(18,18,16,0.34)';
 
-  // Toggle icon
-  const ToggleBtn = () => (
-    <button
-      onClick={() => setSplit(v => !v)}
-      className="absolute top-2.5 right-2.5 z-20 flex items-center justify-center rounded-full"
-      style={{ width: 22, height: 22, background: ink(0.08), border: 'none', cursor: 'pointer', flexShrink: 0 }}
-      title={split ? 'Full view' : 'Split view'}
-    >
-      <svg width="11" height="11" viewBox="0 0 11 11" fill="none">
-        {split ? (
-          <rect x="1" y="1" width="9" height="9" rx="1.5" stroke={ink(0.45)} strokeWidth="1.1"/>
-        ) : (
-          <>
-            <rect x="1"   y="1" width="3.8" height="9" rx="1.2" stroke={ink(0.45)} strokeWidth="1.1"/>
-            <rect x="6.2" y="1" width="3.8" height="9" rx="1.2" stroke={ink(0.45)} strokeWidth="1.1"/>
-          </>
-        )}
-      </svg>
-    </button>
-  );
+  const stats = [
+    { icon: <Wind size={11} />,      label: 'Wind',     value: windSpeed  !== null ? `${Math.round(windSpeed)} km/h` : '–' },
+    { icon: <Droplets size={11} />,  label: 'Humidity', value: humidity   !== null ? `${humidity}%`                : '–' },
+    { icon: <Sun size={11} />,       label: 'UV Index', value: uvLabel(uvIndex) },
+    { icon: <CloudRain size={11} />, label: 'Rain',     value: precipProb !== null ? `${precipProb}%`             : '–' },
+  ];
 
-  if (!split) {
-    return (
-      <section className="rounded-card overflow-hidden relative" style={{ minHeight: 200, background: stops[5] }}>
-        <div className="absolute inset-0" style={{ background: tileBackground, filter: 'blur(32px)', transform: 'scale(1.18)' }} />
-        {grain}
-        <ToggleBtn />
-        <div className="absolute inset-0 z-10 flex flex-col items-center justify-center text-center" style={{ padding: '20px 24px' }}>
-          <span style={{ fontSize: 11, letterSpacing: '0.06em', color: ink(0.42) }}>
-            {wx ? wxCondLabel(code) : ''}
-          </span>
-          <div className="font-semibold tracking-tight leading-none mt-1" style={{ fontSize: 78, color: ink(0.68) }}>
-            {tempStr}
+  return (
+    <section className="bg-surface rounded-card shadow-sm overflow-hidden" style={{ padding: '18px 18px 16px' }}>
+
+      {/* Header: city name + temperature */}
+      <div className="flex items-start justify-between gap-3">
+        <div className="min-w-0 flex-1">
+          <div className="font-semibold tracking-tight leading-tight truncate" style={{ fontSize: 15, color: c1 }}>
+            {city || '–'}
           </div>
-          {city && (
-            <div className="font-medium leading-snug mt-2" style={{ fontSize: 22, color: ink(0.55) }}>
-              {city}
-            </div>
-          )}
-          <div className="flex flex-col items-center gap-0.5 mt-3">
-            {humidity !== null && (
-              <span style={{ fontSize: 11, color: ink(0.38) }}>{humidity}% humidity</span>
-            )}
-            <span style={{ fontSize: 10, color: ink(0.28), fontVariantNumeric: 'tabular-nums' }}>
-              {coordsStr}
-            </span>
+          <div className="mt-0.5 flex items-center gap-1" style={{ fontSize: 11, color: c2 }}>
+            <span>{wx ? wxCondLabel(code) : ''}</span>
+            {wx && <span style={{ color: c3 }}>· {timeStr}</span>}
           </div>
         </div>
-      </section>
-    );
-  }
-
-  // ── Split view ──────────────────────────────────────────────
-  return (
-    <section className="relative flex" style={{ minHeight: 200, gap: 8 }}>
-
-      {/* Left card: gradient + weather */}
-      <div className="relative rounded-card overflow-hidden flex flex-col items-center justify-center text-center"
-        style={{ flex: '0 0 calc(70% - 4px)', background: stops[5], padding: '20px 14px' }}>
-        <div className="absolute inset-0" style={{ background: tileBackground, filter: 'blur(32px)', transform: 'scale(1.18)' }} />
-        {grain}
-        <div className="relative z-10 flex flex-col items-center">
-          <span style={{ fontSize: 10, letterSpacing: '0.06em', color: ink(0.40) }}>
-            {wx ? wxCondLabel(code) : ''}
-          </span>
-          <div className="font-semibold tracking-tight leading-none mt-1" style={{ fontSize: 58, color: ink(0.68) }}>
-            {tempStr}
-          </div>
-          {city && (
-            <div className="font-medium leading-snug mt-2" style={{ fontSize: 14, color: ink(0.52) }}>
-              {city}
-            </div>
-          )}
-          <div className="flex flex-col items-center gap-0.5 mt-2">
-            {humidity !== null && (
-              <span style={{ fontSize: 10, color: ink(0.36) }}>{humidity}% humidity</span>
-            )}
-            <span style={{ fontSize: 9, color: ink(0.24), fontVariantNumeric: 'tabular-nums' }}>
-              {coordsStr}
-            </span>
-          </div>
+        <div className="font-semibold tracking-tight leading-none shrink-0"
+          style={{ fontSize: 48, color: c1, fontVariantNumeric: 'tabular-nums', marginTop: -4 }}>
+          {tempStr}
         </div>
       </div>
 
-      {/* Right card: sun arc */}
-      <div className="relative rounded-card flex flex-col items-center justify-center flex-1"
-        style={{ background: 'var(--surface)', padding: '16px 14px 14px' }}>
-        <ToggleBtn />
-
-        <div className="flex flex-col justify-center w-full" style={{ gap: 0, flex: 1 }}>
-          <span style={{ fontSize: 8, letterSpacing: '.10em', color: 'var(--text-3)', textTransform: 'uppercase' }}>Sunrise</span>
-          <span style={{ fontSize: 19, fontWeight: 500, color: 'var(--text)', lineHeight: 1.15, marginTop: 2 }}>{fmtHour(rise)}</span>
-
-          <div style={{ height: '0.5px', background: 'var(--stroke)', margin: '10px 0' }} />
-
-          <span style={{ fontSize: 8, letterSpacing: '.10em', color: 'var(--text-3)', textTransform: 'uppercase' }}>Sunset</span>
-          <span style={{ fontSize: 19, fontWeight: 500, color: 'var(--text)', lineHeight: 1.15, marginTop: 2 }}>{fmtHour(set)}</span>
-
-          <div style={{ marginTop: 12 }}>
-            <span style={{ fontSize: 9, color: 'var(--text-3)', letterSpacing: '.02em' }}>{daylightH}h {daylightMin}m daylight</span>
+      {/* Stats grid */}
+      <div className="grid grid-cols-2 gap-2 mt-3">
+        {stats.map(({ icon, label, value }) => (
+          <div key={label} className={`rounded-xl p-3 ${isGlass ? '' : 'bg-surface-2'}`} style={isGlass ? { background: subCard } : undefined}>
+            <div className="flex items-center gap-1.5 mb-1.5" style={{ color: c2 }}>
+              {icon}
+              <span style={{ fontSize: 10, letterSpacing: '0.03em' }}>{label}</span>
+            </div>
+            <div className="font-semibold leading-none" style={{ fontSize: 14, color: c1, fontVariantNumeric: 'tabular-nums' }}>
+              {value}
+            </div>
           </div>
-        </div>
+        ))}
       </div>
     </section>
   );
@@ -3019,7 +3097,17 @@ export function LiveCanvas() {
 
     const ctx = canvas.getContext('2d');
 
-    const tick = () => {
+    // Throttle to ~30fps — the heavy blur+contrast filter on the container
+    // re-runs every time the canvas repaints, so halving the frame rate
+    // roughly halves the GPU cost with no perceptible change to the motion.
+    const FRAME_MS = 1000 / 30;
+    let last = 0;
+
+    const tick = (ts) => {
+      rafRef.current = requestAnimationFrame(tick);
+      // Skip work when the window is hidden or before the next frame is due.
+      if (document.hidden || ts - last < FRAME_MS) return;
+      last = ts;
       ctx.clearRect(0, 0, W, H);
       for (const b of balls.current) {
         b.x += b.vx; b.y += b.vy;
@@ -3032,10 +3120,9 @@ export function LiveCanvas() {
         ctx.fillStyle = accent;
         ctx.fill();
       }
-      rafRef.current = requestAnimationFrame(tick);
     };
 
-    tick();
+    rafRef.current = requestAnimationFrame(tick);
     return () => { if (rafRef.current) cancelAnimationFrame(rafRef.current); };
   }, []);
 

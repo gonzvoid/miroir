@@ -1,6 +1,6 @@
 {
   "name": "miroir-dashboard",
-  "version": "0.3.1",
+  "version": "0.3.2",
   "description": "Miroir — personal dashboard for tasks, calendar, mood & ideas",
   "author": "Gonz / Blanco Void",
   "main": "electron/main.js",
@@ -10,12 +10,14 @@
     "dev:demo": "concurrently -k \"vite\" \"wait-on tcp:5173 && cross-env ELECTRON_DEV=1 electron . --user-data-dir=C:/temp/lumen-demo\"",
     "build": "vite build",
     "preview": "vite preview",
-    "package": "vite build && electron-builder"
+    "package": "vite build && electron-builder",
+    "release": "vite build && electron-builder --publish always"
   },
   "dependencies": {
     "@dnd-kit/core": "^6.3.1",
     "@dnd-kit/sortable": "^10.0.0",
     "@dnd-kit/utilities": "^3.2.2",
+    "electron-updater": "^6.8.9",
     "googleapis": "^144.0.0",
     "lucide-react": "^0.460.0",
     "react": "^18.3.1",
@@ -36,6 +38,14 @@
   "build": {
     "appId": "void.blanco.miroir",
     "productName": "Miroir",
+    "publish": [
+      {
+        "provider": "github",
+        "owner": "gonzvoid",
+        "repo": "MiroirRelease",
+        "releaseType": "release"
+      }
+    ],
     "files": [
       "dist/**/*",
       "electron/**/*"

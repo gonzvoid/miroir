@@ -17,7 +17,7 @@ export default {
         'accent-tint': 'var(--accent-tint)',
         'accent-text': 'var(--accent-text)',
       },
-      fontFamily: { sans: ['Inter', 'system-ui', 'sans-serif'] },
+      fontFamily: { sans: ['InterVariable', 'Inter', 'system-ui', 'sans-serif'] },
       borderRadius: { card: '20px', focal: '28px' },
       boxShadow: {
         sm: 'var(--shadow-sm)',

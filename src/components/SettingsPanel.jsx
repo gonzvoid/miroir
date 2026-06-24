@@ -211,6 +211,7 @@ function BgPicker({ bg, onSet, onClear }) {
   const onFile = (e) => {
     const f = e.target.files?.[0]; if (!f) return;
     const r = new FileReader(); r.onload = () => onSet(r.result); r.readAsDataURL(f);
+    e.target.value = '';
   };
   return (
     <div className="flex items-center gap-2">
@@ -218,6 +219,10 @@ function BgPicker({ bg, onSet, onClear }) {
         <>
           <div className="w-10 h-10 rounded-xl bg-cover bg-center border border-stroke shrink-0"
             style={{ backgroundImage: `url(${bg})` }} />
+          <button onClick={() => fileRef.current.click()}
+            className="px-3 py-1.5 rounded-xl bg-surface-2 border border-stroke text-[12.5px] text-text-2 hover:text-text transition-colors">
+            Swap
+          </button>
           <button onClick={onClear}
             className="px-3 py-1.5 rounded-xl bg-surface-2 border border-stroke text-[12.5px] text-text-2 hover:text-text transition-colors">
             Remove
@@ -234,15 +239,69 @@ function BgPicker({ bg, onSet, onClear }) {
   );
 }
 
+/* ── Updates section ──────────────────────────────────────────── */
+function UpdatesSection({ updater }) {
+  const { status, info, progress, error, version, check, download, install } = updater;
+  const available = status === 'available';
+  const ready     = status === 'downloaded';
+
+  return (
+    <div>
+      <Row label="Current version" hint="The version of Miroir running on this machine.">
+        <span className="text-[13px] text-text-2 tabular-nums">{version ? `v${version}` : '—'}</span>
+      </Row>
+
+      <Row label="Updates" hint="Miroir checks for updates automatically on launch. You choose when to download and install.">
+        <div className="flex flex-col items-end gap-2">
+          {!available && !ready && status !== 'downloading' && (
+            <button onClick={check} disabled={status === 'checking'}
+              className="px-4 py-2 rounded-xl bg-surface-2 border border-stroke text-[13px] text-text-2 hover:text-text transition-colors disabled:opacity-50">
+              {status === 'checking' ? 'Checking…' : 'Check for updates'}
+            </button>
+          )}
+
+          {available && (
+            <button onClick={download}
+              className="px-4 py-2 rounded-xl bg-text text-canvas text-[13px] font-medium hover:opacity-75 transition-opacity">
+              Download v{info?.version}
+            </button>
+          )}
+
+          {status === 'downloading' && (
+            <div className="flex flex-col items-end gap-1.5 w-44">
+              <div className="w-full h-1.5 rounded-full bg-surface-2 overflow-hidden">
+                <div className="h-full rounded-full transition-[width] duration-300"
+                  style={{ width: `${progress}%`, background: 'var(--accent)' }} />
+              </div>
+              <span className="text-[11.5px] text-text-3 tabular-nums">Downloading… {progress}%</span>
+            </div>
+          )}
+
+          {ready && (
+            <button onClick={install}
+              className="px-4 py-2 rounded-xl bg-text text-canvas text-[13px] font-medium hover:opacity-75 transition-opacity">
+              Restart to update
+            </button>
+          )}
+
+          {status === 'not-available' && <span className="text-[11.5px] text-text-3">You're up to date.</span>}
+          {status === 'error' && <span className="text-[11.5px] text-red-400 max-w-[240px] text-right leading-snug">{error || 'Update failed'}</span>}
+        </div>
+      </Row>
+    </div>
+  );
+}
+
 /* ── Main SettingsPanel ───────────────────────────────────────── */
 const SECTIONS = [
   { id: 'general',    label: 'General' },
   { id: 'appearance', label: 'Appearance' },
   { id: 'data',       label: 'Data & Backup' },
   { id: 'import',     label: 'Import' },
+  { id: 'updates',    label: 'Updates' },
 ];
 
-export default function SettingsPanel({ s, patch, onClose }) {
+export default function SettingsPanel({ s, patch, updater, onClose }) {
   const [section, setSection] = useState('general');
 
   useEffect(() => {
@@ -361,11 +420,21 @@ export default function SettingsPanel({ s, patch, onClose }) {
               <Row label="Background image" hint="Custom image behind the dashboard tiles.">
                 <BgPicker bg={s.bg} onSet={(v) => patch('bg', v)} onClear={() => patch('bg', null)} />
               </Row>
+
+              <Row label="Tile style" hint="Flat uses solid surfaces. Glass makes tiles frosted and transparent.">
+                <Seg
+                  options={[['flat', 'Flat'], ['glass', 'Glass']]}
+                  value={s.tileStyle ?? 'flat'}
+                  onChange={(v) => patch('tileStyle', v)} />
+              </Row>
             </div>
           )}
 
           {/* ── Data & Backup ─────────────────────────────────── */}
           {section === 'data' && <BackupSection s={s} />}
+
+          {/* ── Updates ───────────────────────────────────────── */}
+          {section === 'updates' && <UpdatesSection updater={updater} />}
 
           {/* ── Import ────────────────────────────────────────── */}
           {section === 'import' && (
