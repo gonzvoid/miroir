@@ -1,0 +1,36 @@
+@tailwind components;
+@tailwind utilities;
+
+/* Theme tokens (app light theme) scoped to the island wrapper so the real
+   components resolve var(--surface), var(--text-3), etc. exactly as in the app. */
+.miroir-island {
+  --canvas:#F4F4F2; --surface:#FFFFFF; --surface-2:#F2F3F1; --surface-3:#ECEDEA; --stroke:#E6E6E3;
+  --text:#141414; --text-2:#7A7A76; --text-3:#A8A8A2;
+  --accent:#334155; --accent-tint:#F0F4F8; --accent-text:#1E293B;
+  --tick-empty:#D6D6D2;
+  --shadow-lg:0 18px 40px -24px rgba(20,20,18,.18),0 4px 12px -8px rgba(20,20,18,.06);
+  --shadow-sm:0 6px 18px -12px rgba(20,20,18,.12);
+  --m-great:#56b49a; --m-good:#86c6b0; --m-okay:#e6c877; --m-low:#eaa06a; --m-rough:#e17c84;
+  font-family: 'InterVariable','Inter',system-ui,sans-serif;
+  color: var(--text);
+  -webkit-font-smoothing: antialiased;
+  text-align: left;
+}
+/* Preflight-equivalent, scoped with :where() (specificity 0) so the components'
+   Tailwind utility classes always win. Tailwind sets border-width:0 + border-style:solid
+   on every element — without it, native input/select borders show and `border-[1.5px]`
+   checkboxes are invisible (default border-style is none). */
+:where(.miroir-island) *, :where(.miroir-island) *::before, :where(.miroir-island) *::after {
+  box-sizing: border-box;
+  border-width: 0;
+  border-style: solid;
+  border-color: var(--stroke);
+}
+:where(.miroir-island) button,
+:where(.miroir-island) input,
+:where(.miroir-island) select,
+:where(.miroir-island) textarea {
+  font: inherit; line-height: inherit; color: inherit;
+  background-color: transparent; margin: 0; padding: 0;
+}
+:where(.miroir-island) button { cursor: pointer; }

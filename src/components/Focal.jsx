@@ -2,10 +2,47 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { LANES, STATUSES, bucketOf, dateForLane } from '../lib/utils';
 import { Plus, Check, Trash2, MoreVertical, GripVertical } from './icons';
 
+const TAG_PALETTE = [
+  '#334155', '#3D5A40', '#5A7D9A', '#8B5A80',
+  '#7A9D6F', '#E3B95E', '#D06B6B', '#9A7A5A',
+  '#5A7A9A', '#9A5A7A', '#6B9A7A', '#C07A40',
+];
+
+function PencilIcon({ size = 13 }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M11.5 2.5a1.414 1.414 0 0 1 2 2L5 13 2 14l1-3 8.5-8.5z" />
+    </svg>
+  );
+}
+
+function ColorSwatch({ current, onChange }) {
+  const [open, setOpen] = useState(false);
+  return (
+    <div className="relative shrink-0">
+      <button onClick={() => setOpen((v) => !v)}
+        className="w-4 h-4 rounded-full border-2 border-transparent hover:border-text-3 transition-colors"
+        style={{ background: current }} />
+      {open && (
+        <div className="absolute left-0 top-full mt-1.5 z-[60] bg-surface border border-stroke rounded-2xl shadow-lg p-2"
+          style={{ width: 120 }} onMouseLeave={() => setOpen(false)}>
+          <div className="grid grid-cols-4 gap-1.5">
+            {TAG_PALETTE.map((c) => (
+              <button key={c} onClick={() => { onChange(c); setOpen(false); }}
+                className="w-5 h-5 rounded-full transition-transform hover:scale-110"
+                style={{ background: c, outline: current === c ? '2px solid var(--text)' : 'none', outlineOffset: 2 }} />
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 export default function Focal({
   tasks, addTask, cycleTask, delTask, editTask,
   setTaskStatus, setTaskLane, moveTask, reorderTask,
-  composerRef, tags,
+  composerRef, tags, setTags,
 }) {
   const [draft, setDraft] = useState('');
   const [lane, setLane] = useState('today');
@@ -16,6 +53,20 @@ export default function Focal({
   const [dragId, setDragId] = useState(null);
   const [hoverId, setHoverId] = useState(null);
   const [completedOpen, setCompletedOpen] = useState(false);
+  const [filter, setFilter] = useState('all');
+  const [showTagEditor, setShowTagEditor] = useState(false);
+  const [addingTag, setAddingTag] = useState(false);
+  const [newTagDraft, setNewTagDraft] = useState({ label: '', color: TAG_PALETTE[0] });
+
+  const updateTag = (id, changes) => setTags?.((ts) => ts.map((t) => (t.id === id ? { ...t, ...changes } : t)));
+  const deleteTag = (id) => { setTags?.((ts) => ts.filter((t) => t.id !== id)); if (filter === id) setFilter('all'); };
+  const addTag = () => {
+    if (!newTagDraft.label.trim()) return;
+    const id = newTagDraft.label.toLowerCase().replace(/\s+/g, '-') + '-' + Date.now();
+    setTags?.((ts) => [...ts, { id, label: newTagDraft.label.trim(), color: newTagDraft.color }]);
+    setNewTagDraft({ label: '', color: TAG_PALETTE[0] });
+    setAddingTag(false);
+  };
 
   const composerWrapRef = useRef(null);
   const ringRef = useRef(null);
@@ -40,20 +91,18 @@ export default function Focal({
     const g = { today: [], tomorrow: [], week: [], future: [] };
     tasks.forEach((t) => {
       if ((t.state || 0) === 2) return; // completed go to their own section
+      if (filter !== 'all' && t.lane !== filter) return;
       g[bucketOf(t.date)]?.push(t);
     });
     return g;
-  }, [tasks]);
+  }, [tasks, filter]);
 
   const completedTasks = useMemo(() =>
     tasks
-      .filter((t) => (t.state || 0) === 2)
+      .filter((t) => (t.state || 0) === 2 && (filter === 'all' || t.lane === filter))
       .sort((a, b) => (b.completedAt || b.date || '').localeCompare(a.completedAt || a.date || '')),
-    [tasks]
+    [tasks, filter]
   );
-
-  const open = tasks.filter((t) => (t.state || 0) !== 2).length;
-  const started = tasks.filter((t) => (t.state || 0) === 1).length;
 
   const tagColor = (id) => tags?.find((t) => t.id === id)?.color ?? 'var(--accent)';
   const tagLabel = (id) => tags?.find((t) => t.id === id)?.label ?? id;
@@ -62,13 +111,71 @@ export default function Focal({
 
   return (
     <section className="bg-surface rounded-focal p-7 pb-6 shadow-lg">
-      <div className="flex justify-between items-baseline mb-5">
-        <div>
-          <div className="text-[15px] font-semibold tracking-tight">Things to do</div>
-          <div className="text-[13px] text-text-2 mt-1">Across every project, by when it matters</div>
-        </div>
-        <div className="text-[13px] text-text-2">
-          <b className="text-text font-semibold">{open}</b> open{started > 0 ? ` · ${started} in progress` : ''}
+      <div className="mb-5">
+        <div className="text-[15px] font-semibold tracking-tight mb-3">Things to do</div>
+
+        {/* tag filter + editor */}
+        <div className="relative flex items-center gap-1">
+          <div className="flex bg-surface-2 rounded-full p-[3px] flex-wrap">
+            <button onClick={() => setFilter('all')}
+              className={`text-[12px] px-3 py-[6px] rounded-full transition-colors ${filter === 'all' ? 'bg-surface text-text font-medium shadow-sm' : 'text-text-2'}`}>
+              All
+            </button>
+            {(tags || []).map((t) => (
+              <button key={t.id} onClick={() => setFilter(t.id)}
+                className={`flex items-center gap-1.5 text-[12px] px-3 py-[6px] rounded-full transition-colors ${filter === t.id ? 'bg-surface text-text font-medium shadow-sm' : 'text-text-2'}`}>
+                <span className="w-1.5 h-1.5 rounded-full shrink-0" style={{ background: t.color }} />
+                {t.label}
+              </button>
+            ))}
+          </div>
+
+          {setTags && (
+            <button onClick={() => { setShowTagEditor((v) => !v); setAddingTag(false); }} title="Edit tags"
+              className={`w-7 h-7 grid place-items-center rounded-full transition-colors shrink-0 ${showTagEditor ? 'bg-accent text-white' : 'bg-surface-2 text-text-3 hover:text-text'}`}>
+              <PencilIcon size={13} />
+            </button>
+          )}
+
+          {showTagEditor && (
+            <div className="absolute right-0 top-full mt-2 bg-surface border border-stroke rounded-2xl shadow-lg p-3 z-50"
+              style={{ minWidth: 220 }}
+              onMouseLeave={() => { if (!addingTag) setShowTagEditor(false); }}>
+              <div className="text-[11px] tracking-widest uppercase text-text-3 mb-2.5 px-1">Tags</div>
+              {(tags || []).map((t) => (
+                <div key={t.id} className="flex items-center gap-2 px-1 py-1.5 rounded-xl hover:bg-surface-2 group">
+                  <ColorSwatch current={t.color} onChange={(c) => updateTag(t.id, { color: c })} />
+                  <input value={t.label} onChange={(e) => updateTag(t.id, { label: e.target.value })}
+                    className="flex-1 text-[13px] bg-transparent outline-none min-w-0" />
+                  <button onClick={() => deleteTag(t.id)}
+                    className="opacity-0 group-hover:opacity-100 text-text-3 hover:text-[#c0564b] p-0.5 transition-opacity shrink-0">
+                    <Trash2 size={12} />
+                  </button>
+                </div>
+              ))}
+              {addingTag ? (
+                <div className="mt-1 px-1 flex flex-col gap-2">
+                  <div className="flex items-center gap-2">
+                    <ColorSwatch current={newTagDraft.color} onChange={(c) => setNewTagDraft((d) => ({ ...d, color: c }))} />
+                    <input autoFocus value={newTagDraft.label}
+                      onChange={(e) => setNewTagDraft((d) => ({ ...d, label: e.target.value }))}
+                      onKeyDown={(e) => { if (e.key === 'Enter') addTag(); if (e.key === 'Escape') setAddingTag(false); }}
+                      placeholder="Tag name"
+                      className="flex-1 text-[13px] bg-surface-2 rounded-xl px-2.5 py-1.5 outline-none min-w-0" />
+                  </div>
+                  <div className="flex gap-1.5">
+                    <button onClick={addTag} className="flex-1 text-[12px] py-1.5 rounded-full bg-accent text-white">Add</button>
+                    <button onClick={() => setAddingTag(false)} className="flex-1 text-[12px] py-1.5 rounded-full bg-surface-2 text-text-2">Cancel</button>
+                  </div>
+                </div>
+              ) : (
+                <button onClick={() => setAddingTag(true)}
+                  className="mt-1 flex items-center gap-1.5 w-full px-2.5 py-2 rounded-xl text-text-3 hover:text-text hover:bg-surface-2 text-[13px] transition-colors">
+                  <Plus size={13} /> New tag
+                </button>
+              )}
+            </div>
+          )}
         </div>
       </div>
 

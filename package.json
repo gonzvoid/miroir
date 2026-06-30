@@ -1,6 +1,6 @@
 {
   "name": "miroir-dashboard",
-  "version": "0.3.2",
+  "version": "0.3.3",
   "description": "Miroir — personal dashboard for tasks, calendar, mood & ideas",
   "author": "Gonz / Blanco Void",
   "main": "electron/main.js",
@@ -9,6 +9,7 @@
     "dev": "concurrently -k \"vite\" \"wait-on tcp:5173 && cross-env ELECTRON_DEV=1 electron .\"",
     "dev:demo": "concurrently -k \"vite\" \"wait-on tcp:5173 && cross-env ELECTRON_DEV=1 electron . --user-data-dir=C:/temp/lumen-demo\"",
     "build": "vite build",
+    "build:islands": "vite build --config vite.islands.config.js",
     "preview": "vite preview",
     "package": "vite build && electron-builder",
     "release": "vite build && electron-builder --publish always"

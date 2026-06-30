@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { X, Check, ImageIcon } from './icons';
-import { ACCENT_PRESETS, ymd } from '../lib/utils';
+import { ACCENT_PRESETS, MOOD_GRADES, DEFAULT_MOOD_METRICS, ymd } from '../lib/utils';
 
 /* ── helpers ──────────────────────────────────────────────────── */
 function Row({ label, hint, children }) {
@@ -296,10 +296,39 @@ function UpdatesSection({ updater }) {
 const SECTIONS = [
   { id: 'general',    label: 'General' },
   { id: 'appearance', label: 'Appearance' },
+  { id: 'mood',       label: 'Mood' },
   { id: 'data',       label: 'Data & Backup' },
   { id: 'import',     label: 'Import' },
   { id: 'updates',    label: 'Updates' },
 ];
+
+function MoodSection({ metrics, setMetrics }) {
+  const grades = Object.values(MOOD_GRADES);
+  const update = (i, changes) => setMetrics((m) => m.map((x, idx) => (idx === i ? { ...x, ...changes } : x)));
+  return (
+    <div>
+      <p className="text-[12px] text-text-3 mb-1 leading-snug">
+        Pick the three things you track each day and a colour for each. The first one is shown larger in the tile.
+      </p>
+      {metrics.map((m, i) => (
+        <Row key={i} label={i === 0 ? 'Primary metric' : `Metric ${i + 1}`}>
+          <div className="flex items-center gap-3">
+            <input value={m.label} maxLength={18}
+              onChange={(e) => update(i, { label: e.target.value })}
+              className="w-36 text-[13px] bg-surface-2 rounded-lg px-3 py-2 outline-none focus:ring-1 focus:ring-accent" />
+            <div className="flex gap-1.5">
+              {grades.map((g) => (
+                <button key={g.id} onClick={() => update(i, { grade: g.id })} title={g.id}
+                  className="w-7 h-7 rounded-lg transition-transform hover:scale-105"
+                  style={{ background: g.grad, outline: m.grade === g.id ? '2px solid var(--text)' : 'none', outlineOffset: 2 }} />
+              ))}
+            </div>
+          </div>
+        </Row>
+      ))}
+    </div>
+  );
+}
 
 export default function SettingsPanel({ s, patch, updater, onClose }) {
   const [section, setSection] = useState('general');
@@ -431,6 +460,10 @@ export default function SettingsPanel({ s, patch, updater, onClose }) {
           )}
 
           {/* ── Data & Backup ─────────────────────────────────── */}
+          {section === 'mood' && (
+            <MoodSection metrics={s.moodMetrics || DEFAULT_MOOD_METRICS} setMetrics={(v) => patch('moodMetrics', v)} />
+          )}
+
           {section === 'data' && <BackupSection s={s} />}
 
           {/* ── Updates ───────────────────────────────────────── */}

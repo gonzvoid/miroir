@@ -14,7 +14,8 @@ import { googleCalendar } from './lib/google';
 import {
   ymd, addDays, startOfDay,
   DEFAULT_CALENDARS, DEFAULT_LOOPS, DEFAULT_TAGS, SEED_EVENT_IDS,
-  LAYOUT_PRESETS, TAGS_PRESETS, TILE_CATALOG, parseYmd,
+  DEFAULT_MOOD_METRICS,
+  LAYOUT_PRESETS, TAGS_PRESETS, TILE_CATALOG,
 } from './lib/utils';
 import { GripVertical, X, Plus } from './components/icons';
 import Header, { TopBar, BottomDock } from './components/Header';
@@ -25,7 +26,7 @@ import SettingsPanel from './components/SettingsPanel';
 import { useUpdater } from './lib/useUpdater';
 import {
   Timeline, DailyLoops, Summary, Countdown, Sources,
-  MoodPanel, CalCard, TaskHistory, Doodle, LunchMenu,
+  MoodGauge, CalCard, TaskHistory, Doodle, LunchMenu,
   FocusTile, ProjectsTile, BooksTile, TripTile, LiveCanvas,
   WorldClockTile, InspoLinksTile, PlantTrackerTile, SocialPlannerTile,
   SunArcTile, MoonPhaseTile, WeatherOrbTile,
@@ -54,7 +55,8 @@ function migrateLayout(l) {
 
 const DEFAULTS = {
   theme: 'light', bg: null, tasks: [], ideas: [], events: [],
-  calendars: DEFAULT_CALENDARS, moods: {}, tileImages: [], imageFolder: null,
+  calendars: DEFAULT_CALENDARS, moods: {}, moodLog: {}, moodMetrics: DEFAULT_MOOD_METRICS, tileImages: [], imageFolder: null,
+  templates: [], activeTemplate: null,
   loops: DEFAULT_LOOPS, countdowns: [], layout: DEFAULT_LAYOUT,
   tags: DEFAULT_TAGS, name: null, workType: null,
   doodles: {}, lunchMenu: {},
@@ -284,7 +286,6 @@ function OnboardingScreen({ onDone, onClose }) {
 /* ================================================================ */
 export default function App() {
   const [s, patch, loaded] = useStore(DEFAULTS);
-  const [filter, setFilter] = useState('all');
   const [viewMonth, setViewMonth] = useState(startOfDay(new Date()));
   const [unlocked, setUnlocked] = useState(false);
   const [activeId, setActiveId] = useState(null);
@@ -330,8 +331,6 @@ export default function App() {
   const tasks = s.tasks, moods = s.moods;
   const layout = migrateLayout(s.layout);
 
-  const [selDay, setSelDay] = useState(ymd(now));
-  const shiftDay = (n) => setSelDay((d) => ymd(addDays(parseYmd(d), n)));
 
   // One-time migration: remove seed events
   useEffect(() => {
@@ -339,6 +338,15 @@ export default function App() {
     if (!s._v || s._v < 2) {
       patch('events', (evs) => (evs || []).filter((e) => !SEED_EVENT_IDS.has(e.id)));
       patch('_v', 2);
+    }
+  }, [loaded]);
+
+  // One-time migration: seed the first layout template from the current layout/theme
+  useEffect(() => {
+    if (!loaded) return;
+    if (!s.templates || s.templates.length === 0) {
+      patch('templates', [{ id: 'general', name: 'General', color: '#3E86CF', layout: s.layout, theme: s.theme }]);
+      patch('activeTemplate', 'general');
     }
   }, [loaded]);
 
@@ -425,12 +433,47 @@ export default function App() {
   const addIdea    = (txt) => { if (!txt.trim()) return; patch('ideas', (i) => [{ id: Date.now() + '', text: txt.trim() }, ...i]); };
   const delIdea    = (id)  => patch('ideas', (i) => i.filter((x) => x.id !== id));
   const ideaToTask = (idea) => { addTask(idea.text, (s.tags?.[0]?.id ?? 'work'), ymd(now)); delIdea(idea.id); };
-  const setMoodSeg = (k, seg, p) => patch('moods', (m) => ({ ...m, [k]: { ...(m[k] || {}), [seg]: { ...((m[k] || {})[seg] || {}), ...p } } }));
+  const setMoodMetric = (k, metricId, pct) => patch('moodLog', (m) => ({ ...m, [k]: { ...(m[k] || {}), [metricId]: pct } }));
+
+  /* layout templates — each stores its own layout + theme; auto-saved on switch */
+  const TEMPLATE_COLORS = ['#3E86CF', '#45433F', '#DA5040', '#3FA98C', '#8B5A80', '#C07A40'];
+  const snapshotActive = (ts) => ts.map((t) => (t.id === s.activeTemplate ? { ...t, layout: s.layout, theme: s.theme } : t));
+  const switchTemplate = (id) => {
+    if (id === s.activeTemplate) return;
+    const target = (s.templates || []).find((t) => t.id === id);
+    if (!target) return;
+    patch('templates', snapshotActive);
+    if (target.layout) patch('layout', target.layout);
+    if (target.theme) patch('theme', target.theme);
+    patch('activeTemplate', id);
+  };
+  const addTemplate = () => {
+    const id = 'tpl-' + Date.now();
+    patch('templates', (ts) => {
+      const snapped = snapshotActive(ts);
+      const used = snapped.map((t) => t.color);
+      const color = TEMPLATE_COLORS.find((c) => !used.includes(c)) || TEMPLATE_COLORS[snapped.length % TEMPLATE_COLORS.length];
+      return [...snapped, { id, name: `Template ${snapped.length + 1}`, color, layout: s.layout, theme: s.theme }];
+    });
+    patch('activeTemplate', id);
+  };
+  const renameTemplate  = (id, name)  => patch('templates', (ts) => ts.map((t) => (t.id === id ? { ...t, name } : t)));
+  const recolorTemplate = (id, color) => patch('templates', (ts) => ts.map((t) => (t.id === id ? { ...t, color } : t)));
+  const deleteTemplate  = (id) => {
+    const ts = s.templates || [];
+    if (ts.length <= 1) return;
+    const rest = ts.filter((t) => t.id !== id);
+    if (id === s.activeTemplate) {
+      const next = rest[0];
+      if (next.layout) patch('layout', next.layout);
+      if (next.theme) patch('theme', next.theme);
+      patch('activeTemplate', next.id);
+    }
+    patch('templates', rest);
+  };
   const focusComposer = () => { const el = composerRef.current; if (!el) return; el.scrollIntoView({ behavior: 'smooth', block: 'center' }); setTimeout(() => el.focus(), 300); };
 
   const tags = s.tags || DEFAULT_TAGS;
-  const vTasks  = useMemo(() => filter === 'all' ? tasks : tasks.filter((t) => t.lane === filter), [tasks, filter]);
-  const vEvents = useMemo(() => filter === 'all' ? allEvents : allEvents.filter((e) => e.calendarId === filter), [allEvents, filter]);
 
   // Migrate legacy tileImages/imageFolder → multi-album format (plain const, no hook)
   const imageAlbums = (s.imageAlbums && s.imageAlbums.length > 0)
@@ -461,9 +504,10 @@ export default function App() {
 
   /* tile map */
   const tileMap = {
-    focal:    <Focal tasks={vTasks} addTask={addTask} cycleTask={cycleTask} delTask={delTask}
+    focal:    <Focal tasks={tasks} addTask={addTask} cycleTask={cycleTask} delTask={delTask}
                 editTask={editTask} setTaskStatus={setTaskStatus} setTaskLane={setTaskLane}
-                moveTask={moveTask} reorderTask={reorderTask} composerRef={composerRef} tags={tags} />,
+                moveTask={moveTask} reorderTask={reorderTask} composerRef={composerRef}
+                tags={tags} setTags={(v) => patch('tags', v)} />,
     summary:  <Summary tasks={tasks} moods={moods} now={now} />,
     tasklog:  <TaskHistory tasks={tasks} now={now} />,
     loops:    <DailyLoops loops={s.loops} setLoops={(v) => patch('loops', v)} />,
@@ -471,14 +515,15 @@ export default function App() {
     lunchMenu:<LunchMenu lunchMenu={s.lunchMenu} setLunchMenu={(v) => patch('lunchMenu', v)} now={now} />,
     image:    <ImageTile albums={imageAlbums} setAlbums={setImageAlbums} />,
     countdown:<Countdown countdowns={s.countdowns} setCountdowns={(v) => patch('countdowns', v)} />,
-    timeline: <Timeline events={vEvents} now={now} />,
+    timeline: <Timeline events={allEvents} now={now} />,
     sources:  <Sources calendars={allCalendars} setCalendars={(v) => patch('calendars', v)}
                 googleAccounts={googleAccounts} onConnect={onConnect} onDisconnect={onDisconnect}
                 onRename={onRename} clearLocalEvents={clearLocalEvents}
                 syncErrors={googleSyncErrors} onRefresh={fetchGoogleEvents} />,
-    calendar: <CalCard viewMonth={viewMonth} setViewMonth={setViewMonth} events={vEvents}
-                calendars={allCalendars} addEvent={addEvent} />,
-    mood:     <MoodPanel selDay={selDay} shiftDay={shiftDay} setSelDay={setSelDay} moods={moods} setMoodSeg={setMoodSeg} now={now} />,
+    calendar: <CalCard viewMonth={viewMonth} setViewMonth={setViewMonth} events={allEvents}
+                calendars={allCalendars} addEvent={addEvent}
+                moodLog={s.moodLog || {}} moodMetrics={s.moodMetrics || DEFAULT_MOOD_METRICS} />,
+    mood:     <MoodGauge metrics={s.moodMetrics || DEFAULT_MOOD_METRICS} log={s.moodLog || {}} day={ymd(now)} setMetric={setMoodMetric} />,
     focus:    <FocusTile pomodoroLog={s.pomodoroLog} onLogSession={logPomodoroSession} />,
     projects: <ProjectsTile projects={s.projects} onAdd={addProject} onUpdate={updateProject} onDelete={deleteProject} />,
     books:    <BooksTile books={s.books} onSet={setCurrentBook} onUpdate={updateCurrentPage} onComplete={completeCurrentBook} onDeleteCompleted={deleteCompletedBook} />,
@@ -644,12 +689,11 @@ export default function App() {
 
         <div className="px-[26px] pb-24">
           <Header
-            theme={s.theme} setTheme={(v) => patch('theme', v)}
-            filter={filter} setFilter={setFilter}
-            now={now} unlocked={unlocked} setUnlocked={setUnlocked}
-            name={s.name} tags={tags} setTags={(v) => patch('tags', v)}
-            onOpenLayoutEditor={() => setShowLayoutEditor(true)}
-            onOpenSettings={() => setShowSettings(true)}
+            now={now} name={s.name}
+            templates={s.templates || []} activeTemplate={s.activeTemplate}
+            onSwitchTemplate={switchTemplate} onAddTemplate={addTemplate}
+            onRenameTemplate={renameTemplate} onRecolorTemplate={recolorTemplate}
+            onDeleteTemplate={deleteTemplate}
           />
           <DndContext sensors={sensors} collisionDetection={closestCorners}
             onDragStart={handleDragStart} onDragOver={handleDragOver} onDragEnd={handleDragEnd}>

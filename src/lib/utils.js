@@ -43,6 +43,29 @@ export const SEGMENTS = [
   { id:'evening', label:'Evening' },
 ];
 
+/* Mood gauge — graded fills, anchored to the cell. Each metric picks a grade.
+   `grad` is the CSS gradient (top = high value, bottom = low). `tint` is the
+   empty-cell background; `text`/`label` are the deep on-tint colors. */
+export const MOOD_GRADES = {
+  green: {
+    id:'green', tint:'#E7F0EE', text:'#1f5e57', label:'#2f7068', dot:'#46B58A',
+    grad:'linear-gradient(180deg,#46B58A 0%,#3E86CF 58%,#2C6BB6 100%)',
+  },
+  graphite: {
+    id:'graphite', tint:'#EDEDEB', text:'#2c2c2a', label:'#5f5e5a', dot:'#45433F',
+    grad:'linear-gradient(180deg,#45433F 0%,#8C8B85 100%)',
+  },
+  redyellow: {
+    id:'redyellow', tint:'#F7ECDB', text:'#8a3a1a', label:'#a8552c', dot:'#DA5040',
+    grad:'linear-gradient(180deg,#DA5040 0%,#E89A3F 55%,#ECC74C 100%)',
+  },
+};
+export const DEFAULT_MOOD_METRICS = [
+  { id:'happiness',    label:'Happiness',    grade:'green' },
+  { id:'productivity', label:'Productivity', grade:'graphite' },
+  { id:'anger',        label:'Anger',        grade:'redyellow' },
+];
+
 export const dateForLane = (l) => {
   const t = new Date();
   if(l==='today') return ymd(t);

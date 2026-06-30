@@ -121,27 +121,16 @@ export function BottomDock({ theme, setTheme, unlocked, setUnlocked, onOpenLayou
   );
 }
 
-/* ── Greeting + filter pills — scrolls with content ── */
+/* ── Greeting + layout-template tabs — scrolls with content ── */
 export default function Header({
-  theme, setTheme, filter, setFilter, now, unlocked, setUnlocked,
-  name, tags, setTags, onOpenLayoutEditor, onOpenSettings,
+  now, name, templates = [], activeTemplate,
+  onSwitchTemplate, onAddTemplate, onRenameTemplate, onRecolorTemplate, onDeleteTemplate,
 }) {
-  const [showTagEditor, setShowTagEditor] = useState(false);
-  const [newTagDraft, setNewTagDraft] = useState({ label: '', color: TAG_PALETTE[0] });
-  const [addingTag, setAddingTag] = useState(false);
+  const [editingId, setEditingId] = useState(null);
 
   const greeting = now.getHours() < 12 ? 'Good morning' : now.getHours() < 19 ? 'Good afternoon' : 'Good evening';
   const displayName = name || 'there';
-
-  const updateTag = (id, changes) => setTags((ts) => ts.map((t) => (t.id === id ? { ...t, ...changes } : t)));
-  const deleteTag = (id) => { setTags((ts) => ts.filter((t) => t.id !== id)); if (filter === id) setFilter('all'); };
-  const addTag = () => {
-    if (!newTagDraft.label.trim()) return;
-    const id = newTagDraft.label.toLowerCase().replace(/\s+/g, '-') + '-' + Date.now();
-    setTags((ts) => [...ts, { id, label: newTagDraft.label.trim(), color: newTagDraft.color }]);
-    setNewTagDraft({ label: '', color: TAG_PALETTE[0] });
-    setAddingTag(false);
-  };
+  const editing = templates.find((t) => t.id === editingId);
 
   return (
     <div className="mb-5">
@@ -155,64 +144,43 @@ export default function Header({
             <div className="text-[22px] font-semibold tracking-tight leading-none" style={{ textWrap: 'balance' }}>{greeting}, {displayName}</div>
           </div>
 
-          {/* filter pills + tag editor */}
+          {/* layout template tabs + new */}
           <div className="relative flex items-center gap-1 shrink-0">
             <div className="flex bg-surface-2 rounded-full p-[3px]">
-              <button onClick={() => setFilter('all')}
-                className={`text-[13px] px-4 py-[7px] rounded-full transition-colors ${filter === 'all' ? 'bg-surface text-text font-medium shadow-sm' : 'text-text-2'}`}>
-                All
-              </button>
-              {(tags || []).map((t) => (
-                <button key={t.id} onClick={() => setFilter(t.id)}
-                  className={`flex items-center gap-1.5 text-[13px] px-3.5 py-[7px] rounded-full transition-colors ${filter === t.id ? 'bg-surface text-text font-medium shadow-sm' : 'text-text-2'}`}>
-                  <span className="w-1.5 h-1.5 rounded-full shrink-0" style={{ background: t.color }} />
-                  {t.label}
-                </button>
-              ))}
+              {templates.map((t) => {
+                const on = t.id === activeTemplate;
+                return (
+                  <button key={t.id}
+                    onClick={() => { if (on) setEditingId((v) => (v === t.id ? null : t.id)); else { onSwitchTemplate(t.id); setEditingId(null); } }}
+                    title={on ? 'Edit template' : `Switch to ${t.name}`}
+                    className={`flex items-center gap-2 text-[13px] px-3.5 py-[7px] rounded-full transition-colors ${on ? 'bg-surface text-text font-medium shadow-sm' : 'text-text-2'}`}>
+                    <span className="w-1.5 h-1.5 rounded-full shrink-0" style={{ background: t.color }} />
+                    {t.name}
+                  </button>
+                );
+              })}
             </div>
 
-            <button onClick={() => { setShowTagEditor((v) => !v); setAddingTag(false); }} title="Edit tags"
-              className={`w-7 h-7 grid place-items-center rounded-full transition-colors ${showTagEditor ? 'bg-accent text-white' : 'bg-surface-2 text-text-3 hover:text-text'}`}>
-              <PencilIcon size={13} />
+            <button onClick={onAddTemplate} title="New template (duplicates current)"
+              className="w-7 h-7 grid place-items-center rounded-full bg-surface-2 text-text-3 hover:text-text transition-colors shrink-0">
+              <Plus size={14} />
             </button>
 
-            {showTagEditor && (
+            {editing && (
               <div className="absolute right-0 top-full mt-2 bg-surface border border-stroke rounded-2xl shadow-lg p-3 z-50"
-                style={{ minWidth: 220 }}
-                onMouseLeave={() => { if (!addingTag) setShowTagEditor(false); }}>
-                <div className="text-[11px] tracking-widest uppercase text-text-3 mb-2.5 px-1">Tags</div>
-                {(tags || []).map((t) => (
-                  <div key={t.id} className="flex items-center gap-2 px-1 py-1.5 rounded-xl hover:bg-surface-2 group">
-                    <ColorSwatch current={t.color} onChange={(c) => updateTag(t.id, { color: c })} />
-                    <input value={t.label} onChange={(e) => updateTag(t.id, { label: e.target.value })}
-                      className="flex-1 text-[13px] bg-transparent outline-none min-w-0" />
-                    <button onClick={() => deleteTag(t.id)}
-                      className="opacity-0 group-hover:opacity-100 text-text-3 hover:text-[#c0564b] p-0.5 transition-opacity shrink-0">
-                      <Trash2 size={12} />
-                    </button>
-                  </div>
-                ))}
-                {addingTag ? (
-                  <div className="mt-1 px-1 flex flex-col gap-2">
-                    <div className="flex items-center gap-2">
-                      <ColorSwatch current={newTagDraft.color} onChange={(c) => setNewTagDraft((d) => ({ ...d, color: c }))} />
-                      <input autoFocus value={newTagDraft.label}
-                        onChange={(e) => setNewTagDraft((d) => ({ ...d, label: e.target.value }))}
-                        onKeyDown={(e) => { if (e.key === 'Enter') addTag(); if (e.key === 'Escape') setAddingTag(false); }}
-                        placeholder="Tag name"
-                        className="flex-1 text-[13px] bg-surface-2 rounded-xl px-2.5 py-1.5 outline-none min-w-0" />
-                    </div>
-                    <div className="flex gap-1.5">
-                      <button onClick={addTag} className="flex-1 text-[12px] py-1.5 rounded-full bg-accent text-white">Add</button>
-                      <button onClick={() => setAddingTag(false)} className="flex-1 text-[12px] py-1.5 rounded-full bg-surface-2 text-text-2">Cancel</button>
-                    </div>
-                  </div>
-                ) : (
-                  <button onClick={() => setAddingTag(true)}
-                    className="mt-1 flex items-center gap-1.5 w-full px-2.5 py-2 rounded-xl text-text-3 hover:text-text hover:bg-surface-2 text-[13px] transition-colors">
-                    <Plus size={13} /> New tag
-                  </button>
-                )}
+                style={{ minWidth: 230 }}
+                onMouseLeave={() => setEditingId(null)}>
+                <div className="text-[11px] tracking-widest uppercase text-text-3 mb-2.5 px-1">Template</div>
+                <div className="flex items-center gap-2 px-1 mb-2.5">
+                  <ColorSwatch current={editing.color} onChange={(c) => onRecolorTemplate(editing.id, c)} />
+                  <input value={editing.name} onChange={(e) => onRenameTemplate(editing.id, e.target.value)}
+                    className="flex-1 text-[13px] bg-surface-2 rounded-xl px-2.5 py-1.5 outline-none min-w-0" />
+                </div>
+                <button onClick={() => { onDeleteTemplate(editing.id); setEditingId(null); }}
+                  disabled={templates.length <= 1}
+                  className="flex items-center gap-1.5 w-full px-2.5 py-2 rounded-xl text-[13px] transition-colors text-text-2 hover:text-[#c0564b] hover:bg-surface-2 disabled:opacity-30 disabled:cursor-default disabled:hover:text-text-2 disabled:hover:bg-transparent">
+                  <Trash2 size={13} /> Delete template
+                </button>
               </div>
             )}
           </div>

@@ -6,4 +6,5 @@ export {
   MoreVertical, GripVertical, Lock, LockOpen, Settings,
   Globe, Clock, Droplets, Leaf, ExternalLink,
   Wind, CloudRain,
+  Sprout, LeafyGreen, Flower2, TreePine, Clover,
 } from 'lucide-react';

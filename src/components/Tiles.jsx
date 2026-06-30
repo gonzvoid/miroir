@@ -1,12 +1,14 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   WEEKDAYS, SEGMENTS, MOODS, MOOD_SCORE, moodColor, COUNTDOWNS,
+  MOOD_GRADES, DEFAULT_MOOD_METRICS,
   startOfDay, addDays, sameDay, ymd, parseYmd,
 } from '../lib/utils';
 import {
   Plus, Check, X, ChevronLeft, ChevronRight, Trash2, ArrowRight, Link2,
   CheckSquare, CalIcon, Globe, Clock, Droplets, ExternalLink, Settings,
   Wind, CloudRain, Sun,
+  Leaf, Sprout, LeafyGreen, Flower2, TreePine, Clover,
 } from './icons';
 
 const Card = ({ children, className = '' }) => (
@@ -624,11 +626,75 @@ export function MoodPanel({ selDay, shiftDay, setSelDay, moods, setMoodSeg, now 
   );
 }
 
+/* ---------------- Mood gauge (graded fill meters) ---------------- */
+function Gauge({ pct, grade, label, big, onSet }) {
+  const ref = useRef(null);
+  const drag = useRef({ active: false, moved: false, startY: 0 });
+  const commit = (clientY) => {
+    const el = ref.current; if (!el) return;
+    const r = el.getBoundingClientRect();
+    const p = Math.round(((r.bottom - clientY) / r.height) * 100);
+    onSet(Math.max(0, Math.min(100, p)));
+  };
+  const down = (e) => {
+    drag.current = { active: true, moved: false, startY: e.clientY };
+    try { ref.current.setPointerCapture(e.pointerId); } catch { /* noop */ }
+  };
+  const move = (e) => {
+    const d = drag.current; if (!d.active) return;
+    if (Math.abs(e.clientY - d.startY) > 4) d.moved = true;
+    if (d.moved) commit(e.clientY);
+  };
+  const up = () => {
+    const d = drag.current; if (!d.active) return;
+    if (!d.moved) onSet(pct >= 100 ? 0 : Math.min(100, pct + 10)); // tap = +10, wraps
+    d.active = false;
+  };
+  const overWater = pct > 70;
+  const numColor = overWater ? '#fff' : grade.text;
+  const lblColor = overWater ? 'rgba(255,255,255,.85)' : grade.label;
+  return (
+    <div ref={ref} onPointerDown={down} onPointerMove={move} onPointerUp={up} onPointerCancel={up}
+      className="relative flex-1 rounded-[16px] overflow-hidden select-none cursor-ns-resize"
+      style={{ background: grade.tint, touchAction: 'none' }}>
+      <div className="absolute inset-0" style={{ background: grade.grad, clipPath: `inset(${100 - pct}% 0 0 0)` }} />
+      <div className="absolute left-0 right-0" style={{ bottom: `${pct}%`, height: 2, background: 'rgba(255,255,255,.5)' }} />
+      <div className="absolute left-1/2 rounded-full" style={{ bottom: `${pct}%`, transform: 'translate(-50%,50%)', width: big ? 30 : 28, height: 6, background: 'rgba(255,255,255,.85)' }} />
+      <div className="relative" style={{ padding: big ? '15px 16px' : '13px 15px' }}>
+        <div style={{ fontSize: big ? 34 : 27, fontWeight: 600, letterSpacing: '-0.03em', lineHeight: 1, color: numColor }}>
+          {pct}<span style={{ fontSize: big ? 20 : 16 }}>%</span>
+        </div>
+        <div style={{ fontSize: big ? 13 : 12, fontWeight: 500, marginTop: big ? 6 : 4, color: lblColor }}>{label}</div>
+      </div>
+    </div>
+  );
+}
+
+export function MoodGauge({ metrics = DEFAULT_MOOD_METRICS, log = {}, day, setMetric }) {
+  const today = log[day] || {};
+  const [m0, m1, m2] = metrics;
+  const grade = (m) => MOOD_GRADES[m?.grade] || MOOD_GRADES.green;
+  const val = (m) => Math.max(0, Math.min(100, Math.round(today[m?.id] ?? 0)));
+  return (
+    <section className="bg-surface rounded-card shadow-sm p-[10px] h-[300px] flex gap-[10px]">
+      {m0 && <Gauge big pct={val(m0)} grade={grade(m0)} label={m0.label} onSet={(p) => setMetric(day, m0.id, p)} />}
+      <div className="flex-1 flex flex-col gap-[10px]">
+        {m1 && <Gauge pct={val(m1)} grade={grade(m1)} label={m1.label} onSet={(p) => setMetric(day, m1.id, p)} />}
+        {m2 && <Gauge pct={val(m2)} grade={grade(m2)} label={m2.label} onSet={(p) => setMetric(day, m2.id, p)} />}
+      </div>
+    </section>
+  );
+}
+
 /* ---------------- Calendar (Month / Week / Day) ---------------- */
-export function CalCard({ viewMonth, setViewMonth, events, calendars, addEvent }) {
+export function CalCard({ viewMonth, setViewMonth, events, calendars, addEvent, moodLog = {}, moodMetrics = DEFAULT_MOOD_METRICS }) {
   const today = startOfDay(new Date());
   const [view, setView] = useState('month');
   const [selDay, setSelDay] = useState(ymd(today));
+  const [moodMetric, setMoodMetric] = useState(moodMetrics[0]?.id);
+  const moodCols = useMemo(() => Array.from({ length: 30 }, (_, i) => ymd(addDays(today, i - 29))), [today]);
+  const activeMetric = moodMetrics.find((m) => m.id === moodMetric) || moodMetrics[0];
+  const activeGrade = MOOD_GRADES[activeMetric?.grade] || MOOD_GRADES.green;
   const [weekStart, setWeekStart] = useState(() => { const dow = (today.getDay() + 6) % 7; return addDays(today, -dow); });
   const [addingEvent, setAddingEvent] = useState(false);
   const [evDraft, setEvDraft] = useState({ title: '', date: ymd(today), time: '', calendarId: 'work' });
@@ -760,6 +826,42 @@ export function CalCard({ viewMonth, setViewMonth, events, calendars, addEvent }
               ))
             }
           </div>
+
+          {moodMetrics.length > 0 && (
+            <div className="mt-3 pt-3 border-t border-stroke">
+              <div className="flex justify-between items-center mb-2">
+                <span className="text-[12px] font-medium">Mood · 30 days</span>
+                <div className="flex bg-surface-2 rounded-full p-0.5">
+                  {moodMetrics.map((m) => {
+                    const g = MOOD_GRADES[m.grade] || MOOD_GRADES.green;
+                    const on = m.id === moodMetric;
+                    return (
+                      <button key={m.id} onClick={() => setMoodMetric(m.id)} title={m.label}
+                        className={`w-6 h-6 grid place-items-center rounded-full transition-colors ${on ? 'bg-surface shadow-sm' : ''}`}>
+                        <span className="w-2.5 h-2.5 rounded-full" style={{ background: g.dot, opacity: on ? 1 : 0.4 }} />
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+              <div className="flex gap-[2px] items-end">
+                {moodCols.map((key) => {
+                  const pct = moodLog[key]?.[activeMetric?.id];
+                  const has = typeof pct === 'number';
+                  return (
+                    <div key={key} className="flex-1 rounded-[3px] overflow-hidden bg-surface-2" style={{ height: 40, position: 'relative' }}
+                      title={`${parseYmd(key).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}${has ? ` · ${pct}%` : ''}`}>
+                      {has && <div className="absolute inset-0" style={{ background: activeGrade.grad, clipPath: `inset(${100 - pct}% 0 0 0)` }} />}
+                    </div>
+                  );
+                })}
+              </div>
+              <div className="flex justify-between mt-1">
+                <span className="text-[10px] text-text-3">{parseYmd(moodCols[0]).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}</span>
+                <span className="text-[10px] text-text-3">Today</span>
+              </div>
+            </div>
+          )}
         </>
       )}
 
@@ -2357,7 +2459,16 @@ export function InspoLinksTile({ links, setLinks }) {
 /* ─────────────────────────────────────────────────────────────
    Plant Tracker
 ───────────────────────────────────────────────────────────── */
-const PLANT_COLORS = ['#4ade80', '#86efac', '#bbf7d0', '#fbbf24', '#f97316', '#f87171'];
+/* Plant icons in green tones that harmonize with the Mood palette */
+const PLANT_ICONS = [
+  { id: 'sprout', Icon: Sprout,     color: '#4f9d92' },
+  { id: 'leaf',   Icon: Leaf,       color: '#56b49a' },
+  { id: 'leafy',  Icon: LeafyGreen, color: '#6fb98a' },
+  { id: 'flower', Icon: Flower2,    color: '#86c6b0' },
+  { id: 'tree',   Icon: TreePine,   color: '#7aa86a' },
+  { id: 'clover', Icon: Clover,     color: '#9bbf86' },
+];
+const plantIconById = (id) => PLANT_ICONS.find((p) => p.id === id) || PLANT_ICONS[0];
 const WATER_INTERVALS = [
   { days: 2,  label: 'Every 2 days' },
   { days: 3,  label: 'Every 3 days' },
@@ -2383,20 +2494,21 @@ function plantWaterStatus(plant) {
 }
 
 export function PlantTrackerTile({ plants, setPlants }) {
-  const [adding, setAdding]       = useState(false);
-  const [nameDraft, setName]       = useState('');
-  const [plantColor, setPlantColor] = useState(PLANT_COLORS[0]);
-  const [interval, setInterval]    = useState(7);
+  const [adding, setAdding]     = useState(false);
+  const [nameDraft, setName]     = useState('');
+  const [plantIcon, setPlantIcon] = useState(PLANT_ICONS[0].id);
+  const [interval, setInterval]  = useState(7);
 
   const addPlant = () => {
     const name = nameDraft.trim();
     if (!name) return;
+    const ic = plantIconById(plantIcon);
     setPlants([...plants, {
-      id: `p${Date.now()}`, name, color: plantColor,
+      id: `p${Date.now()}`, name, icon: ic.id, color: ic.color,
       intervalDays: interval, lastWatered: null,
     }]);
     setName('');
-    setPlantColor(PLANT_COLORS[0]);
+    setPlantIcon(PLANT_ICONS[0].id);
     setInterval(7);
     setAdding(false);
   };
@@ -2438,47 +2550,55 @@ export function PlantTrackerTile({ plants, setPlants }) {
             </button>
           </div>
           <div className="flex gap-1.5 items-center">
-            {PLANT_COLORS.map((c) => (
-              <button key={c} onClick={() => setPlantColor(c)}
-                className="w-5 h-5 rounded-full transition-transform hover:scale-110 shrink-0"
-                style={{ background: c, outline: plantColor === c ? '2px solid var(--text)' : 'none', outlineOffset: 2 }} />
+            {PLANT_ICONS.map(({ id, Icon, color }) => (
+              <button key={id} onClick={() => setPlantIcon(id)}
+                className="w-8 h-8 rounded-xl grid place-items-center transition-transform hover:scale-110 shrink-0"
+                style={{
+                  color,
+                  background: plantIcon === id ? 'var(--surface-2)' : 'transparent',
+                  outline: plantIcon === id ? '1.5px solid currentColor' : 'none', outlineOffset: -1.5,
+                }}>
+                <Icon size={17} strokeWidth={1.8} />
+              </button>
             ))}
           </div>
         </div>
       )}
 
-      <div className="flex flex-col gap-1">
-        {plants.map((p) => {
-          const status = plantWaterStatus(p);
-          return (
-            <div key={p.id}
-              className="group flex items-center gap-3 px-2 py-2.5 rounded-xl hover:bg-surface-2 transition-colors">
-              <div className="w-3 h-3 rounded-full shrink-0" style={{ background: p.color ?? '#4ade80' }} />
-              <div className="flex-1 min-w-0">
-                <div className="text-[13px] font-medium text-text leading-tight">{p.name}</div>
-                <div className="text-[11px] truncate" style={{ color: status.color }}>{status.label}</div>
-              </div>
-              <div className="flex items-center gap-1 shrink-0">
-                <button onClick={() => water(p.id)}
-                  className={`flex items-center gap-1 text-[11px] px-2 py-1 rounded-lg transition-colors
-                    ${status.urgent
-                      ? 'bg-[#dbeafe] text-[#2563eb] hover:bg-[#bfdbfe]'
-                      : 'bg-surface-3 text-text-2 hover:bg-accent-tint hover:text-accent-text'}`}>
-                  <Droplets size={10} />
-                  Water
-                </button>
+      {plants.length === 0 ? (
+        <p className="text-[13px] text-text-3 py-1">No plants yet.</p>
+      ) : (
+        <div className="grid grid-cols-2 gap-2.5">
+          {plants.map((p) => {
+            const status = plantWaterStatus(p);
+            const Icon = p.icon ? plantIconById(p.icon).Icon : Leaf;
+            return (
+              <div key={p.id}
+                className="group relative flex flex-col bg-surface-2 rounded-2xl p-3.5">
                 <button onClick={() => removePlant(p.id)}
-                  className="opacity-0 group-hover:opacity-100 text-text-3 hover:text-red-400 transition-all p-0.5">
+                  className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 text-text-3 hover:text-red-400 transition-all p-0.5">
                   <X size={12} />
                 </button>
+
+                <Icon size={30} strokeWidth={1.7} style={{ color: p.color ?? '#56b49a' }} />
+
+                <div className="mt-2.5 min-w-0">
+                  <div className="text-[14px] font-medium text-text leading-tight truncate">{p.name}</div>
+                  <div className="text-[11.5px] mt-1 truncate" style={{ color: status.color }}>{status.label}</div>
+                </div>
+
+                <button onClick={() => water(p.id)}
+                  className={`mt-3 flex items-center justify-center gap-1.5 text-[11.5px] py-1.5 rounded-lg transition-colors
+                    ${status.urgent
+                      ? 'bg-[#dbeafe] text-[#2563eb] hover:bg-[#bfdbfe]'
+                      : 'bg-surface text-text-2 hover:bg-accent-tint hover:text-accent-text'}`}>
+                  <Droplets size={11} /> Water
+                </button>
               </div>
-            </div>
-          );
-        })}
-        {plants.length === 0 && (
-          <p className="text-[13px] text-text-3 py-1">No plants yet.</p>
-        )}
-      </div>
+            );
+          })}
+        </div>
+      )}
     </Card>
   );
 }
